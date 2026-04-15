@@ -2,6 +2,7 @@
 
 > **给 Cursor Agent 的指令**：你正在操作的是**用户业务项目**的根目录。以下文件应已存在（由 `npx figma-cache cursor init` 从 npm 包 **`figma-cache-toolchain`** 复制到当前仓库根）：
 > - `.cursor/rules/01-figma-cache-core.mdc`
+> - `.cursor/rules/00-output-token-budget.mdc`（通用低 token 输出基线）
 > - `.cursor/rules/02-figma-stack-adapter.mdc`（**占位**，任务完成后需删除）
 > - `.cursor/rules/figma-local-cache-first.mdc`（可选保留）
 > - `.cursor/skills/figma-mcp-local-cache/SKILL.md`
@@ -36,6 +37,11 @@
    - 提示用户在本项目根执行：`npm run figma:cache:validate`（若已加 script）或 `npx figma-cache validate`。  
    - 说明：后续 Figma 相关对话将主要由 **01 Core + 新 Adapter + Skill** 驱动。  
       - **可选**：若项目已通过 `cursor init` 同步 `figma-cache/docs/colleague-guide-zh.md`，提示团队默认只使用 **§5.1「最推荐主提示词」**，只有特殊诉求再追加 **§5.2** 的一句附加要求。
+
+## 输出与 token 约束（强制）
+- 默认“只要结果”：不输出思考过程，不粘贴 MCP 长回包。
+- 执行 Figma MCP 后，用户可见回复只保留：缓存状态、调用次数、产物路径、校验结论、失败修复动作。
+- 除非用户明确要求，禁止在 chat 中贴出 `get_design_context` 全文；原始内容仅保存到 `mcp-raw/*`。
 
 ## 硬约束（违反则视为未完成）
 

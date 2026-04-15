@@ -56,7 +56,9 @@ alwaysApply: true
 12. **严格 validate（强制）**：`validate` 不仅校验索引字段，还校验证据完整性：
    - `completeness` 声明的维度必须在 `raw.json.coverageSummary.evidence` 中提供非空证据
    - 对 `source=figma-mcp` 且声明 `interactions/states/accessibility` 的节点，禁止保留 TODO 占位内容
-13. **大文件读取策略（强制）**：仅在 UI 还原/像素对齐/组件实现任务中读取 `mcp-raw-get-design-context.txt` 全文；非 UI 任务（命中检查、预算统计、校验、流程维护）默认仅读取 `raw.json` / `spec.md` / `mcp-raw-manifest.json`。
+13. **大文件读取策略（强制）**：
+   - **UI 还原/像素对齐/组件实现任务**：默认必须读取 `mcp-raw-get-design-context.txt` 全文，不反复讨论是否需要读取。
+   - **非 UI 任务**（命中检查、预算统计、校验、流程维护）：默认仅读取 `raw.json` / `spec.md` / `mcp-raw-manifest.json`。
 14. **闭环校验（强制）**：每次 **`npm run figma:cache:upsert`** 或 **`npm run figma:cache:ensure`** 成功结束后，**自动静默**执行 `npm run figma:cache:validate`。
 15. validate 失败 → **自行修复并重复 validate 直至通过**，不得宣称缓存已就绪。
 16. **不写前端**：本阶段禁止输出业务组件实现；若用户要求写 UI，在缓存就绪后转由 **栈专属 Adapter 规则**（如 `02-figma-stack-adapter.mdc` 占位，或项目内 `02-figma-<栈>-adapter.mdc`）接管。
@@ -70,6 +72,13 @@ alwaysApply: true
 
 - 若本轮自动追加了 `flow`，必须在回复中显式写明触发原因：`关键词命中` 或 `多链接串联意图`（二选一或同时命中）。
 
+## 低 Token 输出模式（强制）
+- 默认采用“结果优先”输出：仅保留最终结论与必要审计字段，不输出思考过程。
+- MCP 工具回包（尤其 `get_design_context`）禁止在用户可见回复中粘贴全文或大段复述；仅报告调用计数、来源、文件路径与校验结果。
+- 除非用户明确要求查看原文，`mcp-raw` 内容仅落盘到文件，不在 chat 回显。
+- 进度反馈最小化：缓存任务默认 0-1 条简短进度更新；完成后一次性给出结果。
+- 失败场景也保持精简：仅输出失败原因、定位文件、下一步修复动作。
+
 ## 配置与钩子
 - `npm run figma:cache:config` 可查看是否加载 `hooks.postEnsure`。
 - `ensure` 在写入通用骨架后会调用 `hooks.postEnsure`；钩子异常**不得**阻断 ensure 成功退出（由 Core 捕获）。
@@ -79,6 +88,9 @@ alwaysApply: true
 - 缓存目录、环境变量、`flows`、陈旧策略、提交前校验等与原「Local Cache First」一致，参见 `figma-cache/` 内文档及 `npm run figma:cache:*`。
 - 对同一节点写缓存时，优先复用本轮已拿到的 MCP 响应做落盘，避免“仅为生成原始文件而重复调同一工具”。
 - 若保存原始数据，统一写入节点目录下 `mcp-raw/` 子目录（如 `mcp-raw/mcp-raw-get-design-context.txt`），与加工缓存文件分层。
+- `mcp-raw` 原始文件**禁止**写入任何摘要/截断标记（如 `omitted for brevity`、`...response omitted...`、`省略`、`截断`）；必须直存完整 MCP 回包。
+- `mcp-raw/mcp-raw-manifest.json` 必须记录每个工具原始文件的 `fileHashes`（sha256）与 `fileSizes`（utf8 字节数）；`validate` 会逐项比对，不一致即失败。
+- **落盘后即时反精简检查（强制）**：每次写入 `mcp-raw` 后，必须立刻检查是否出现摘要/截断标记与 hash/size 不一致；检查结果必须在用户回复中显式输出为 `mcp-raw anti-truncation: pass|fail`（失败时附修复动作）。
 - 默认不写 `whoami` 原始文件；仅在鉴权排障或用户显式要求账号态审计时才写入。
 - 单节点 MCP 调用预算默认不超过 3 次；超过时必须在输出中说明缺口字段与补调原因。
 - 仅对超时/5xx做指数退避重试；对参数错误/权限错误不重试，直接报告并等待用户指令。

@@ -21,6 +21,10 @@ function copyCursorBootstrap(force, deps) {
 
   const pairs = [
     {
+      from: path.join("rules", "00-output-token-budget.mdc"),
+      to: path.join(".cursor", "rules", "00-output-token-budget.mdc"),
+    },
+    {
       from: path.join("rules", "01-figma-cache-core.mdc"),
       to: path.join(".cursor", "rules", "01-figma-cache-core.mdc"),
     },
@@ -45,6 +49,7 @@ function copyCursorBootstrap(force, deps) {
     process.exit(1);
   }
 
+  const overwrite = !force;
   let copied = 0;
   let skipped = 0;
   pairs.forEach(({ from: relFrom, to: relTo }) => {
@@ -55,7 +60,7 @@ function copyCursorBootstrap(force, deps) {
       process.exit(1);
     }
     fs.mkdirSync(path.dirname(absTo), { recursive: true });
-    if (fs.existsSync(absTo) && !force) {
+    if (fs.existsSync(absTo) && !overwrite) {
       skipped += 1;
       return;
     }
@@ -137,8 +142,11 @@ function copyCursorBootstrap(force, deps) {
         copied,
         skipped,
         force: !!force,
+        overwriteByDefault: overwrite,
         hint: skipped
-          ? "Some template files were skipped (already exist). Re-run with --force to overwrite."
+          ? "Some template files were skipped (--force means keep existing files)."
+          : overwrite
+          ? "Done. Existing .cursor templates were overwritten by latest bootstrap."
           : "Done.",
         configFile: normalizeSlash(projectConfigPath),
         configAction,

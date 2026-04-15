@@ -1,7 +1,17 @@
 /* eslint-disable no-console */
+const crypto = require("crypto");
 
 function isTodoLike(value) {
   return /TODO/i.test(String(value || ""));
+}
+
+function hasTruncatedMarker(value) {
+  const text = String(value || "");
+  return (
+    /omitted\s+for\s+brevity/i.test(text) ||
+    /省略|截断|已截短|摘要版/i.test(text) ||
+    /\.\.\.\s*(MCP|get_design_context|response|回包|原始响应)/i.test(text)
+  );
 }
 
 function getManifestFilesMap(cacheKey, item, errors, deps) {
@@ -23,6 +33,14 @@ function getManifestFilesMap(cacheKey, item, errors, deps) {
     errors.push(`${cacheKey}: mcp-raw-manifest.json 缺少 files 映射`);
     return null;
   }
+  const fileHashes =
+    manifest.fileHashes && typeof manifest.fileHashes === "object" ? manifest.fileHashes : null;
+  const fileSizes =
+    manifest.fileSizes && typeof manifest.fileSizes === "object" ? manifest.fileSizes : null;
+  if (!fileHashes || !fileSizes) {
+    errors.push(`${cacheKey}: mcp-raw-manifest.json 缺少 fileHashes/fileSizes 完整性映射`);
+  }
+
   Object.entries(manifest.files).forEach(([toolName, fileName]) => {
     if (!fileName) {
       errors.push(`${cacheKey}: mcp-raw-manifest.json 中 ${toolName} 未关联文件`);
@@ -31,6 +49,40 @@ function getManifestFilesMap(cacheKey, item, errors, deps) {
     const fileAbs = path.join(mcpRawDir, String(fileName));
     if (!fs.existsSync(fileAbs)) {
       errors.push(`${cacheKey}: 缺少 MCP 原始文件 ${normalizeSlash(fileAbs)}`);
+      return;
+    }
+    const content = String(fs.readFileSync(fileAbs, "utf8") || "");
+    if (!content.trim()) {
+      errors.push(`${cacheKey}: MCP 原始文件为空 ${normalizeSlash(fileAbs)}`);
+      return;
+    }
+    if (hasTruncatedMarker(content)) {
+      errors.push(
+        `${cacheKey}: ${toolName} 原始文件疑似被截断/摘要化，必须直存完整回包 ${normalizeSlash(
+          fileAbs
+        )}`
+      );
+      return;
+    }
+    if (fileHashes && fileSizes) {
+      const expectedHash = String(fileHashes[toolName] || "").trim().toLowerCase();
+      const expectedSize = Number(fileSizes[toolName]);
+      if (!expectedHash || !Number.isFinite(expectedSize)) {
+        errors.push(`${cacheKey}: mcp-raw-manifest.json 中 ${toolName} 缺少 sha256/size`);
+        return;
+      }
+      const actualHash = crypto.createHash("sha256").update(content, "utf8").digest("hex");
+      const actualSize = Buffer.byteLength(content, "utf8");
+      if (actualHash !== expectedHash) {
+        errors.push(
+          `${cacheKey}: ${toolName} sha256 不匹配（expected=${expectedHash} actual=${actualHash}）`
+        );
+      }
+      if (actualSize !== expectedSize) {
+        errors.push(
+          `${cacheKey}: ${toolName} size 不匹配（expected=${expectedSize} actual=${actualSize}）`
+        );
+      }
     }
   });
   return manifest.files;

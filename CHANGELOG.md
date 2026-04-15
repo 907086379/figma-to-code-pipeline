@@ -6,6 +6,14 @@
 
 - 暂无
 
+## 2.0.0（2026-04-15）
+
+- **`cursor init` 模板策略变更（Breaking）**：默认改为覆盖同名 `.cursor/rules` 与 `.cursor/skills` 为最新模板；`--force` 改为“保留本地已存在模板并跳过覆盖”。
+- **通用低 token 规则下发**：新增 `00-output-token-budget.mdc`，并在 `cursor init` 时自动复制到项目 `.cursor/rules/`，实现“结果优先、最小回显”的默认行为。
+- **Figma 缓存规则强化**：新增“`mcp-raw` 落盘后即时反精简检查”与结果输出要求（`mcp-raw anti-truncation: pass|fail`），降低摘要化回包误入缓存风险。
+- **读取策略定稿**：UI/组件实现任务默认读取 `mcp-raw-get-design-context.txt` 全文；仅逻辑/流程等 UI 无关任务走 `raw/spec/manifest` 轻量读取。
+- **任务书与文档同步**：`AGENT-SETUP-PROMPT.md`、`README.md`、`figma-cache/docs/README.md` 对齐上述行为，并补充低 token 协作口径。
+
 ## 1.4.5（2026-04-15）
 
 - **文档重构**：重写 `figma-cache/docs/colleague-guide-zh.md`，统一为最新流程口径（缓存优先、证据门禁、validate 闭环、flow 白名单）。

@@ -353,7 +353,7 @@ function run() {
     console.log(`  ${ex} flow show --flow=<flowId>`);
     console.log(`  ${ex} flow mermaid --flow=<flowId>`);
     console.log(
-      `${ex} cursor init [--force]  # copy .cursor templates + ensure figma-cache.config.js (+ cleanup safe legacy example) + refresh AGENT-SETUP-PROMPT.md + sync colleague-guide-zh.md into FIGMA_CACHE_DIR`,
+      `${ex} cursor init [--force]  # default: overwrite .cursor templates with latest bootstrap; --force keeps existing templates (skip overwrite)`,
     );
     process.exit(1);
   }
@@ -361,7 +361,9 @@ function run() {
   if (cmd === "cursor") {
     const sub = args[0];
     if (sub !== "init") {
-      console.error("Usage: figma-cache cursor init [--force]");
+      console.error(
+        "Usage: figma-cache cursor init [--force]  # default overwrite; --force keeps existing templates",
+      );
       process.exit(1);
     }
     const force = args.includes("--force");

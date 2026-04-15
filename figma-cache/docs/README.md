@@ -77,6 +77,7 @@ npm run figma:cache:config
 
 - `validate` 会检查 `raw.json.coverageSummary.evidence` 与 `completeness` 是否一致。
 - 当 `source=figma-mcp` 且声明 `interactions/states/accessibility` 时，不允许保留 TODO 占位说明。
+- `validate` 会检查 `mcp-raw-manifest.json` 的 `fileHashes`（sha256）与 `fileSizes`（utf8 字节数），并逐项比对原始文件；缺失或不一致会直接失败。
 - 若你仅想先落骨架，可使用 `--allow-skeleton-with-figma-mcp`（仅放行 upsert/ensure 写入，不放行 validate）；后续必须补齐证据并通过 `validate`。
 
 ### 预算统计（token/调用）
@@ -133,7 +134,7 @@ npm run figma:cache:init
 - **项目根**仍需：`figma-cache.config.js`、`.cursor/` 规则与 Skill、`AGENT-SETUP-PROMPT.md`（或由等价流程生成）。
 - Vue2+Vuetify2 参考 Adapter：`cursor-bootstrap/examples/vue2-vuetify2-adapter.reference.mdc`（npm 安装时在 `node_modules/.../cursor-bootstrap/examples/`）。
 
-说明：Cursor **不会**在 `npm install` 时写入 `.cursor/`；`npx figma-cache cursor init` 负责从包内复制模板。已存在模板时 `cursor init` 默认**跳过**（`--force` 覆盖）；**`AGENT-SETUP-PROMPT.md` 每次 `cursor init` 均刷新**。
+说明：Cursor **不会**在 `npm install` 时写入 `.cursor/`；`npx figma-cache cursor init` 负责从包内复制模板。`cursor init` 默认**覆盖**同名模板为最新版本（`--force` 可改为保留已有模板并跳过覆盖）；并会下发通用低 token 规则 `00-output-token-budget.mdc`；**`AGENT-SETUP-PROMPT.md` 每次 `cursor init` 均刷新**。
 
 ## package.json scripts 示例
 

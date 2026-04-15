@@ -32,7 +32,9 @@ npx figma-cache cursor init
 
 该命令会：
 
-- 写入或跳过（已存在且未使用 `--force`）`.cursor/rules/`、`.cursor/skills/`
+- 默认覆盖写入最新 `.cursor/rules/`、`.cursor/skills/` 模板
+- 新增通用规则：`.cursor/rules/00-output-token-budget.mdc`（全任务低 token 输出基线）
+- 若需保留已存在模板，可使用 `npx figma-cache cursor init --force`（跳过同名覆盖）
 - 确保根目录存在 `figma-cache.config.js`
 - 刷新根目录 `AGENT-SETUP-PROMPT.md`
 - 同步刷新 `figma-cache/docs/colleague-guide-zh.md`

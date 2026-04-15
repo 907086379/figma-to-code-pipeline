@@ -1,6 +1,7 @@
 "use strict";
 
 const { execSync } = require("child_process");
+const crypto = require("crypto");
 const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
@@ -66,17 +67,44 @@ function createTempEnv(prefix) {
   return { tempRoot, cacheDir, env };
 }
 
-function ensureMcpEvidence(cacheDir, files) {
+function ensureMcpEvidence(cacheDir, filesOrOptions) {
   const nodeDir = path.join(cacheDir, "files", FILE_KEY, "nodes", SAFE_NODE_ID);
   const mcpRawDir = path.join(nodeDir, "mcp-raw");
   fs.mkdirSync(mcpRawDir, { recursive: true });
 
-  const filesMap = files || {
+  const defaultFilesMap = {
     get_design_context: "mcp-raw-get-design-context.txt",
     get_metadata: "mcp-raw-get-metadata.xml",
     get_variable_defs: "mcp-raw-get-variable-defs.json",
   };
+  const options =
+    filesOrOptions &&
+    typeof filesOrOptions === "object" &&
+    !Array.isArray(filesOrOptions) &&
+    (Object.prototype.hasOwnProperty.call(filesOrOptions, "files") ||
+      Object.prototype.hasOwnProperty.call(filesOrOptions, "contents"))
+      ? filesOrOptions
+      : {};
+  const filesMap =
+    options.files ||
+    (filesOrOptions && !options.files && !options.contents ? filesOrOptions : null) ||
+    defaultFilesMap;
+  const contents = options.contents || {};
 
+  const fileHashes = {};
+  const fileSizes = {};
+  Object.entries(filesMap).forEach(([tool, fileName]) => {
+    let content =
+      Object.prototype.hasOwnProperty.call(contents, tool) ? contents[tool] : `mock evidence: ${tool}`;
+    if (tool === "get_metadata") {
+      content = Object.prototype.hasOwnProperty.call(contents, tool) ? contents[tool] : "<instance/>";
+    } else if (tool === "get_variable_defs") {
+      content = Object.prototype.hasOwnProperty.call(contents, tool) ? contents[tool] : "{}";
+    }
+    fs.writeFileSync(path.join(mcpRawDir, fileName), content, "utf8");
+    fileHashes[tool] = crypto.createHash("sha256").update(content, "utf8").digest("hex");
+    fileSizes[tool] = Buffer.byteLength(content, "utf8");
+  });
   fs.writeFileSync(
     path.join(mcpRawDir, "mcp-raw-manifest.json"),
     JSON.stringify(
@@ -85,22 +113,14 @@ function ensureMcpEvidence(cacheDir, files) {
         fileKey: FILE_KEY,
         nodeId: NODE_ID,
         files: filesMap,
+        fileHashes,
+        fileSizes,
       },
       null,
       2
     ),
     "utf8"
   );
-
-  Object.entries(filesMap).forEach(([tool, fileName]) => {
-    let content = `mock evidence: ${tool}`;
-    if (tool === "get_metadata") {
-      content = "<instance/>";
-    } else if (tool === "get_variable_defs") {
-      content = "{}";
-    }
-    fs.writeFileSync(path.join(mcpRawDir, fileName), content, "utf8");
-  });
 
   return { nodeDir, mcpRawDir };
 }
@@ -158,6 +178,35 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
   assert.strictEqual(result.cacheKey, CACHE_KEY);
 }
 
+// strict evidence: truncated/omitted mcp-raw should be rejected
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-upsert-truncated-");
+  ensureMcpEvidence(cacheDir, {
+    contents: {
+      get_design_context:
+        "const x = 1;\n/* ... MCP get_design_context response omitted for brevity ... */\n",
+    },
+  });
+  const err = expectThrow(
+    () => runWithEnv(`upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens`, env),
+    "upsert should fail when mcp-raw is truncated"
+  );
+  assert.strictEqual(err.status, 2, "upsert should fail with exit code 2");
+}
+
+// strict evidence: hash/size mismatch should be rejected
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-upsert-integrity-");
+  const { mcpRawDir } = ensureMcpEvidence(cacheDir);
+  const designContextPath = path.join(mcpRawDir, "mcp-raw-get-design-context.txt");
+  fs.writeFileSync(designContextPath, "tampered evidence content", "utf8");
+  const err = expectThrow(
+    () => runWithEnv(`upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens`, env),
+    "upsert should fail when hash/size integrity is broken"
+  );
+  assert.strictEqual(err.status, 2, "upsert should fail with exit code 2");
+}
+
 // skeleton bypass: allow-skeleton allows write, but validate must still block missing evidence
 {
   const { env } = createTempEnv("figma-cache-smoke-skeleton-bypass-");
@@ -205,10 +254,10 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
   assert.strictEqual(err.status, 2, "validate should fail with exit code 2");
 }
 
-// strict validate: TODO placeholders are forbidden for figma-mcp interactions/states/accessibility
+// strict validate: ensure should auto-hydrate TODO placeholders for figma-mcp
 {
   const { cacheDir, env } = createTempEnv("figma-cache-smoke-validate-todo-");
-  ensureMcpEvidence(cacheDir);
+  const { nodeDir } = ensureMcpEvidence(cacheDir);
 
   runWithEnv(
     `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
@@ -219,11 +268,57 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
     env
   );
 
-  const err = expectThrow(
-    () => runWithEnv("validate", env),
-    "validate should fail for TODO placeholders"
+  const spec = fs.readFileSync(path.join(nodeDir, "spec.md"), "utf8");
+  const stateMap = fs.readFileSync(path.join(nodeDir, "state-map.md"), "utf8");
+  const raw = fs.readFileSync(path.join(nodeDir, "raw.json"), "utf8");
+  assert.ok(!/TODO/i.test(spec), "spec.md should be auto-hydrated for figma-mcp");
+  assert.ok(!/TODO/i.test(stateMap), "state-map.md should be auto-hydrated for figma-mcp");
+  assert.ok(!/TODO/i.test(raw), "raw.json notes should be auto-hydrated for figma-mcp");
+
+  runWithEnv("validate", env);
+}
+
+// strict validate: ensure should auto-hydrate non-TODO placeholders for figma-mcp
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-validate-placeholder-cn-");
+  const { nodeDir } = ensureMcpEvidence(cacheDir);
+
+  runWithEnv(
+    `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
   );
-  assert.strictEqual(err.status, 2, "validate should fail with exit code 2");
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+
+  const specPath = path.join(nodeDir, "spec.md");
+  const stateMapPath = path.join(nodeDir, "state-map.md");
+  const rawPath = path.join(nodeDir, "raw.json");
+  fs.writeFileSync(specPath, "# Figma Spec\n\n- 待补充：结构说明\n", "utf8");
+  fs.writeFileSync(stateMapPath, "# State Map\n\n- 待完善：交互状态表\n", "utf8");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.interactions.notes = "待补充";
+  raw.states.notes = "待完善";
+  raw.accessibility.notes = "待确认";
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+
+  const nextSpec = fs.readFileSync(specPath, "utf8");
+  const nextStateMap = fs.readFileSync(stateMapPath, "utf8");
+  const nextRaw = fs.readFileSync(rawPath, "utf8");
+  assert.ok(!/待补充|待完善|待确认/i.test(nextSpec), "spec.md placeholder should be hydrated");
+  assert.ok(
+    !/待补充|待完善|待确认/i.test(nextStateMap),
+    "state-map.md placeholder should be hydrated"
+  );
+  assert.ok(!/待补充|待完善|待确认/i.test(nextRaw), "raw.json placeholder should be hydrated");
+
+  runWithEnv("validate", env);
 }
 
 

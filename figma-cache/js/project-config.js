@@ -23,7 +23,9 @@ function createProjectConfigService(deps) {
     if (process.env.FIGMA_CACHE_PROJECT_CONFIG) {
       candidates.push(resolveMaybeAbsolutePath(process.env.FIGMA_CACHE_PROJECT_CONFIG));
     }
+    candidates.push(path.join(ROOT, "figma-cache.config.cjs"));
     candidates.push(path.join(ROOT, "figma-cache.config.js"));
+    candidates.push(path.join(ROOT, ".figmacacherc.cjs"));
     candidates.push(path.join(ROOT, ".figmacacherc.js"));
 
     const requireFromRoot = createRequire(path.join(ROOT, "package.json"));

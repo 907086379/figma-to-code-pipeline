@@ -77,16 +77,21 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 7. **两阶段拉取**：先最小必要调用并检查字段缺口；仅在缺口存在时补调。
 8. 同一参数的 MCP 工具在单轮内不得重复调用；若需落盘原始数据，必须优先复用首次响应。
 9. **原始大文本直存策略**：当需保存 `mcp-raw-get-design-context.txt` 时，优先直接写入 `mcp-raw/` 子目录（不改写、不摘要、不二次解释），避免把整段文本再次喂给模型。
-10. **本地分析优先**：若本地已存在可用 `mcp-raw-*` 与缓存加工文件，且用户未要求刷新/强制最新，后续分析默认只读本地文件，不再调用 Figma MCP。
-11. 发生 MCP 拉取或本地补齐时，写入/更新 `meta.json`、`spec.md`、必要补充文件，并更新索引。
-12. **`ensure` 语义边界（强制）**：`figma:cache:ensure` 仅补齐索引与骨架文件，不能替代 MCP 拉取；不得把“执行了 ensure”当成“完成了 figma-mcp 调用”。
-13. **MCP 证据门禁（强制）**：当输出来源声明为 `figma-mcp` 时，节点目录必须存在 `mcp-raw/` 及最小调用集原始回包（按 completeness 裁剪）；若缺失，立即停止并报告“未完成”，不得宣称更新成功。
-14. **调用预算**：单节点默认 MCP 调用不超过 3 次；超过时必须在回复中说明缺口字段与补调理由。
-15. **重试策略**：仅对超时/5xx进行指数退避重试；参数错误/权限错误不重试并直接报告。
-16. **大文件读取策略（强制）**：仅在“UI 还原/像素对齐/组件实现”任务时读取 `mcp-raw-get-design-context.txt` 全文；非 UI 实现任务（如命中检查、预算统计、校验、流程维护）默认只读 `raw.json`/`spec.md`/`mcp-raw-manifest.json`，避免无意义 token 消耗。
-17. **闭环校验（强制）**：凡本轮执行了 **`npm run figma:cache:upsert`** 或 **`npm run figma:cache:ensure`**（任意参数组合），在命令成功结束后，Agent **必须**在同一仓库根目录**自动、静默**执行 `npm run figma:cache:validate`。
-18. **校验失败**：根据脚本输出修复索引、`paths`、缺失文件、JSON 结构等，**循环执行 validate 直至退出码为 0**；不得在 validate 未通过时结束本轮「写缓存」任务。
-19. 对用户反馈时除 Blockquote 外可补充：`source: local-cache` / `source: figma-mcp` 与简要文件列表（不必粘贴完整终端日志）。
+10. **反截断约束（强制）**：`mcp-raw` 文件中禁止出现摘要/截断标记（如 `omitted for brevity`、`...response omitted...`、`省略`、`截断`）；一旦出现，必须视为无效证据并重新落盘完整回包。
+11. **完整性签名（强制）**：`mcp-raw-manifest.json` 必须提供 `fileHashes`（sha256）与 `fileSizes`（utf8 字节数）；任一工具文件不匹配即视为证据损坏。
+12. **落盘后即时反精简检查（强制）**：每次写入 `mcp-raw` 后，必须立即执行反精简检查（截断标记 + hash/size）；并在用户回复中显式输出 `mcp-raw anti-truncation: pass|fail`。
+13. **本地分析优先**：若本地已存在可用 `mcp-raw-*` 与缓存加工文件，且用户未要求刷新/强制最新，后续分析默认只读本地文件，不再调用 Figma MCP。
+14. 发生 MCP 拉取或本地补齐时，写入/更新 `meta.json`、`spec.md`、必要补充文件，并更新索引。
+15. **`ensure` 语义边界（强制）**：`figma:cache:ensure` 仅补齐索引与骨架文件，不能替代 MCP 拉取；不得把“执行了 ensure”当成“完成了 figma-mcp 调用”。
+16. **MCP 证据门禁（强制）**：当输出来源声明为 `figma-mcp` 时，节点目录必须存在 `mcp-raw/` 及最小调用集原始回包（按 completeness 裁剪）；若缺失，立即停止并报告“未完成”，不得宣称更新成功。
+17. **调用预算**：单节点默认 MCP 调用不超过 3 次；超过时必须在回复中说明缺口字段与补调理由。
+18. **重试策略**：仅对超时/5xx进行指数退避重试；参数错误/权限错误不重试并直接报告。
+19. **大文件读取策略（强制）**：
+   - UI 还原/像素对齐/组件实现任务：默认必须读取 `mcp-raw-get-design-context.txt` 全文，不反复拉扯“是否需要读全文”。
+   - 非 UI 任务（命中检查、预算统计、校验、流程维护）：默认只读 `raw.json`/`spec.md`/`mcp-raw-manifest.json`。
+20. **闭环校验（强制）**：凡本轮执行了 **`npm run figma:cache:upsert`** 或 **`npm run figma:cache:ensure`**（任意参数组合），在命令成功结束后，Agent **必须**在同一仓库根目录**自动、静默**执行 `npm run figma:cache:validate`。
+21. **校验失败**：根据脚本输出修复索引、`paths`、缺失文件、JSON 结构等，**循环执行 validate 直至退出码为 0**；不得在 validate 未通过时结束本轮「写缓存」任务。
+22. 对用户反馈时除 Blockquote 外可补充：`source: local-cache` / `source: figma-mcp`、`mcp-raw anti-truncation: pass|fail` 与简要文件列表（不必粘贴完整终端日志）。
 
 ## Agent 最终输出格式（强制）
 - 触发 `<Trigger Conditions>` 且本轮触碰缓存读写的回复，**第一段**必须为单行 Blockquote：
@@ -165,6 +170,8 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 - **必须先**输出规定的缓存状态 Blockquote，再给出设计结论或实现说明。
 - 若跳过 MCP，Blockquote 中来源为 Local，状态多为「命中」。
 - 若调用 MCP，Blockquote 中来源为 MCP，状态多为「缺失→更新」或「更新」，并在后文简述触发原因（未命中/信息不足/用户强刷）。
+- 默认采用低 token 输出：不回显 MCP 原始正文，仅输出调用统计、文件落盘与校验结果。
+- 用户若明确要求“查看原文/贴出回包”时，才输出必要片段；默认引导用户查看 `mcp-raw/*` 本地文件。
 
 ## 推荐命令（v2 流程）
 - `npm run figma:cache:init`：初始化空索引（用于纯净移植）

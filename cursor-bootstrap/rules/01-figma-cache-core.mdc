@@ -42,6 +42,10 @@ alwaysApply: true
    - `interactions` / `flow` / `states` → `get_design_context` + `state-map.md`/`flows` 回写
    - `accessibility`（若任务声明）→ 优先 `get_design_context` 的语义线索，不足时标注缺口
    - `assets`（若任务声明）→ `get_design_context` 中资产 URL；仅当用户要求截图留档再调 `get_screenshot`
+   - **flow 自动追加白名单（强制）**：默认 completeness 基线为 `layout,text,tokens,interactions,states,accessibility`（不含 `flow`）；仅在命中白名单时自动追加 `flow`：
+     - 用户明确表达关系/流程意图，且语义命中关键词：`关联`、`流程`、`跳转`、`前后页`、`上一步`、`下一步`、`分支`、`链路`、`路径`、`from/to`、`next`、`branch`
+     - 同轮或断续出现多个 Figma 链接，且存在明确先后或串联意图（如 A->B）
+     - 单链接且无关系意图、仅视觉微调、仅资产导出时，禁止自动追加 `flow`
 9. **两阶段拉取**：先按最小必要工具取数并检查字段缺口；仅在缺口存在时进入第二阶段补调工具。
 10. **写入一致性门禁（强制）**：当 `source=figma-mcp` 或输出来源标注 MCP 时，节点目录必须存在 `mcp-raw/` 与对应原始文件；若缺失则视为未完成，必须停止并报告，不得宣称“更新成功”。
 11. **严格证据门禁（强制）**：当 `source=figma-mcp` 且未显式传入 `--allow-skeleton-with-figma-mcp` 时，`upsert/ensure` 必须在写入前校验 `mcp-raw` 证据：
@@ -63,6 +67,8 @@ alwaysApply: true
 `> 🔄 Figma 缓存状态: [命中|缺失|更新] | 来源: [Local|MCP] | 节点: {nodeId}`
 
 （语义与 `index.json` 中 `nodeId` / `__FILE__` 约定同前；Blockquote 后再写结论。）
+
+- 若本轮自动追加了 `flow`，必须在回复中显式写明触发原因：`关键词命中` 或 `多链接串联意图`（二选一或同时命中）。
 
 ## 配置与钩子
 - `npm run figma:cache:config` 可查看是否加载 `hooks.postEnsure`。

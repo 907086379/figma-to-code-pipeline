@@ -48,6 +48,9 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 ## 流程关系（Flow）
 - `figma-cache/index.json` 中的 `flows` 用于维护业务/交互流程的节点集合与边关系。
 - 当用户描述「下一步/分支/同一流程」时，应同步更新对应 `flow` 的 `nodes/edges`。
+- 默认 completeness 不含 `flow`；仅命中 flow 白名单时自动追加。
+- flow 白名单：关系关键词（关联/流程/跳转/前后页/上一步/下一步/分支/链路/路径/from/to/next/branch），或同轮/断续多链接且明确串联意图。
+- 不触发：单链接且无关系意图、仅视觉微调、仅资产导出。
 
 ## 标准流程
 1. 按 `figma-cache/docs/link-normalization-spec.md` 标准化链接并生成键：
@@ -169,6 +172,8 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 - `npm run figma:cache:get -- "<figma-url>"`：检查命中情况
 - 先执行 MCP 最小调用集并写入 `mcp-raw/`，再执行：`npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`
 - `npm run figma:cache:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`：自动补齐缓存骨架文件（非 MCP 拉取）
+- 若命中 flow 白名单场景，自动或显式追加：`--completeness=layout,text,tokens,interactions,states,accessibility,flow`
+- 一旦自动追加了 `flow`，对用户回复必须附带触发原因：`关键词命中` 或 `多链接串联意图`。
 - MCP 默认最小调用集：`get_design_context(excludeScreenshot=true)` + `get_metadata` + `get_variable_defs`
 - `npm run figma:cache:validate`：**每次 upsert/ensure 成功后必须自动执行**；失败则修至通过
 - `npm run figma:cache:budget`：查看 MCP 节点预算汇总（默认 `--mcp-only`，按文件大小估算 token 代理）

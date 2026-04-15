@@ -1,4 +1,4 @@
-﻿# Figma Cache：请 Agent 一次性完成项目适配
+# Figma Cache：请 Agent 一次性完成项目适配
 
 > **给 Cursor Agent 的指令**：你正在操作的是**用户业务项目**的根目录。以下文件应已存在（由 `npx figma-cache cursor init` 从 npm 包 **`figma-cache-toolchain`** 复制到当前仓库根）：
 > - `.cursor/rules/01-figma-cache-core.mdc`
@@ -42,6 +42,8 @@
 - **不要**修改 `node_modules/figma-cache-toolchain/` 下已发布包内文件（应无此必要）。  
 - **不要**修改 `figma-cache/figma-cache.js` 或破坏 Core「框架中立」语义。  
 - **不要**把业务路由名、具体组件库 API 写进 `figma-cache/files/**` 下的 `meta.json` / `raw.json` / `spec.md`。
+- **不要**把 `flow` 设为默认 completeness；必须保持默认 `layout,text,tokens,interactions,states,accessibility`，并仅在 flow 白名单命中时追加（关系关键词或多链接串联意图）。
+- **必须**在按本文件完成全部任务且验证成功后，删除本文件 `AGENT-SETUP-PROMPT.md`，避免重复执行；若删除失败或仍存在该文件，视为任务未完成。
 
 ## 可选参考（仅在用户需要 Vue2+Vuetify2 时）
 

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "description": "Figma cache -> mobile implementation mapping template",
+  "dimensions": {
+    "layout": {
+      "ios": [
+        "映射到 SwiftUI 布局层级（VStack/HStack/ZStack）",
+        "记录关键间距、尺寸、对齐与安全区策略"
+      ],
+      "android": [
+        "映射到 Compose 布局层级（Column/Row/Box）",
+        "记录关键间距、尺寸、对齐与窗口适配策略"
+      ]
+    },
+    "text": {
+      "ios": [
+        "提取文案 key 与回退文案",
+        "区分标题/正文/辅助文本语义"
+      ],
+      "android": [
+        "提取 string 资源 key 与默认文案",
+        "区分标题/正文/提示文本语义"
+      ]
+    },
+    "tokens": {
+      "ios": [
+        "颜色 -> Color token",
+        "字体 -> Typography token",
+        "间距/圆角 -> Spacing/Radius token"
+      ],
+      "android": [
+        "颜色 -> colorScheme 或 XML color",
+        "字体 -> typography",
+        "间距/圆角 -> dimension token"
+      ]
+    },
+    "interactions": {
+      "ios": [
+        "触发事件（tap/longPress/focus change）",
+        "导航与副作用（sheet/navigation/async）"
+      ],
+      "android": [
+        "触发事件（click/longClick/focus change）",
+        "导航与副作用（nav/action/async）"
+      ]
+    },
+    "states": {
+      "ios": [
+        "状态枚举（loading/empty/error/disabled）",
+        "状态到视图映射规则"
+      ],
+      "android": [
+        "UI state sealed class",
+        "状态到渲染分支映射规则"
+      ]
+    },
+    "accessibility": {
+      "ios": [
+        "VoiceOver 标签、hint、traits",
+        "焦点顺序与可达性分组"
+      ],
+      "android": [
+        "TalkBack contentDescription/role",
+        "焦点顺序与无障碍动作"
+      ]
+    }
+  }
+}

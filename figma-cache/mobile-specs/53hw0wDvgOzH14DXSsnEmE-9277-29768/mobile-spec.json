@@ -1,0 +1,98 @@
+{
+  "generatedAt": "2026-04-15T09:04:12.439Z",
+  "source": {
+    "cacheKey": "53hw0wDvgOzH14DXSsnEmE#9277:29768",
+    "outputKey": "53hw0wDvgOzH14DXSsnEmE-9277-29768",
+    "url": "https://www.figma.com/file/53hw0wDvgOzH14DXSsnEmE/?node-id=9277%3A29768",
+    "fileKey": "53hw0wDvgOzH14DXSsnEmE",
+    "nodeId": "9277:29768",
+    "syncedAt": "2026-04-15T08:17:41.125Z",
+    "completeness": [
+      "layout",
+      "text",
+      "tokens",
+      "interactions",
+      "states",
+      "accessibility"
+    ],
+    "coverageMissing": [
+      "flow",
+      "assets"
+    ],
+    "paths": {
+      "raw": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/raw.json",
+      "spec": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/spec.md",
+      "meta": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/meta.json"
+    }
+  },
+  "normalized": {
+    "layout": "- TODO: 补充布局结构与关键尺寸。",
+    "text": "- TODO: 补充关键文案与语义。",
+    "tokens": "- TODO: 补充颜色、字体、间距等 token 映射。",
+    "interactions": "- TODO: 补充触发条件、状态流转、键盘行为。\n\nTODO: 补充点击、键盘、失焦、外部点击等交互规则。",
+    "states": "- TODO: 补充 default / hover / active / focus / disabled 等状态定义。\n\nTODO: 补充状态矩阵（default/hover/active/focus/disabled）。",
+    "accessibility": "- TODO: 补充 ARIA、焦点顺序、读屏文案和对比度要求。\n\nTODO: 补充 ARIA、焦点管理、读屏文本、无障碍要求。"
+  },
+  "todoWarnings": [
+    "layout: contains TODO",
+    "text: contains TODO",
+    "tokens: contains TODO",
+    "interactions: contains TODO",
+    "states: contains TODO",
+    "accessibility: contains TODO",
+    "coverage missing: flow",
+    "coverage missing: assets"
+  ],
+  "platforms": {
+    "ios": {
+      "implementationInputs": {
+        "layout": "- TODO: 补充布局结构与关键尺寸。",
+        "text": "- TODO: 补充关键文案与语义。",
+        "tokens": "- TODO: 补充颜色、字体、间距等 token 映射。",
+        "interactions": "- TODO: 补充触发条件、状态流转、键盘行为。\n\nTODO: 补充点击、键盘、失焦、外部点击等交互规则。",
+        "states": "- TODO: 补充 default / hover / active / focus / disabled 等状态定义。\n\nTODO: 补充状态矩阵（default/hover/active/focus/disabled）。",
+        "accessibility": "- TODO: 补充 ARIA、焦点顺序、读屏文案和对比度要求。\n\nTODO: 补充 ARIA、焦点管理、读屏文本、无障碍要求。"
+      },
+      "riskHints": [
+        "layout: contains TODO",
+        "text: contains TODO",
+        "tokens: contains TODO",
+        "interactions: contains TODO",
+        "states: contains TODO",
+        "accessibility: contains TODO",
+        "coverage missing: flow",
+        "coverage missing: assets"
+      ],
+      "suggestedStack": [
+        "SwiftUI",
+        "Design Tokens",
+        "State-driven ViewModel"
+      ]
+    },
+    "android": {
+      "implementationInputs": {
+        "layout": "- TODO: 补充布局结构与关键尺寸。",
+        "text": "- TODO: 补充关键文案与语义。",
+        "tokens": "- TODO: 补充颜色、字体、间距等 token 映射。",
+        "interactions": "- TODO: 补充触发条件、状态流转、键盘行为。\n\nTODO: 补充点击、键盘、失焦、外部点击等交互规则。",
+        "states": "- TODO: 补充 default / hover / active / focus / disabled 等状态定义。\n\nTODO: 补充状态矩阵（default/hover/active/focus/disabled）。",
+        "accessibility": "- TODO: 补充 ARIA、焦点顺序、读屏文案和对比度要求。\n\nTODO: 补充 ARIA、焦点管理、读屏文本、无障碍要求。"
+      },
+      "riskHints": [
+        "layout: contains TODO",
+        "text: contains TODO",
+        "tokens: contains TODO",
+        "interactions: contains TODO",
+        "states: contains TODO",
+        "accessibility: contains TODO",
+        "coverage missing: flow",
+        "coverage missing: assets"
+      ],
+      "suggestedStack": [
+        "Jetpack Compose",
+        "Material Theme",
+        "UI State Holder"
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "checkbox",
+  "description": "Generic checkbox recipe for multi-select controls",
+  "structureTemplate": [
+    "control",
+    "check-indicator",
+    "label",
+    "helper-text"
+  ],
+  "stateMachine": {
+    "requiredStates": ["unchecked", "checked", "disabled"],
+    "optionalStates": ["indeterminate", "error"]
+  },
+  "tokenPriority": [
+    "control-bg",
+    "control-border",
+    "icon",
+    "label-text"
+  ],
+  "pitfalls": [
+    "Do not skip indeterminate style if design includes partial selection",
+    "Do not hide disabled state contrast"
+  ]
+}

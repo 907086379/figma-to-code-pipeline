@@ -144,6 +144,113 @@ function dedupeTokenFacts(facts) {
   return output;
 }
 
+function mergeContractWithOverride(contract, override, hardErrors, cacheKey) {
+  const base = contract && typeof contract === "object" ? contract : {};
+  const nodeOverride = override && typeof override === "object" ? override : {};
+  const merged = {
+    ...base,
+    tokenMappings: [...(Array.isArray(base.tokenMappings) ? base.tokenMappings : [])],
+    stateMappings: {
+      ...(base.stateMappings && typeof base.stateMappings === "object" ? base.stateMappings : {}),
+    },
+    layoutRules: [...(Array.isArray(base.layoutRules) ? base.layoutRules : [])],
+    typographyRules: [...(Array.isArray(base.typographyRules) ? base.typographyRules : [])],
+    interactionRules: [...(Array.isArray(base.interactionRules) ? base.interactionRules : [])],
+  };
+
+  if (!nodeOverride || Object.keys(nodeOverride).length === 0) {
+    return merged;
+  }
+
+  const overrideTokenMappings = Array.isArray(nodeOverride.tokenMappings)
+    ? nodeOverride.tokenMappings
+    : [];
+  overrideTokenMappings.forEach((overrideMapping) => {
+    const tokenName = String(overrideMapping.figmaToken || "")
+      .trim()
+      .toLowerCase();
+    const global = merged.tokenMappings.find(
+      (entry) => String(entry.figmaToken || "").trim().toLowerCase() === tokenName
+    );
+    if (
+      global &&
+      global.projectBinding &&
+      overrideMapping.projectBinding &&
+      String(global.projectBinding.value || "") !== String(overrideMapping.projectBinding.value || "")
+    ) {
+      hardErrors.push(
+        `node override conflict: ${cacheKey} token '${overrideMapping.figmaToken}' projectBinding differs from global contract`
+      );
+    }
+  });
+  merged.tokenMappings.push(...overrideTokenMappings);
+
+  const overrideStateMappings =
+    nodeOverride.stateMappings && typeof nodeOverride.stateMappings === "object"
+      ? nodeOverride.stateMappings
+      : {};
+  Object.entries(overrideStateMappings).forEach(([key, value]) => {
+    const global = merged.stateMappings[key];
+    if (global && Array.isArray(global.requiredStates) && value && Array.isArray(value.requiredStates)) {
+      const missing = global.requiredStates.filter(
+        (state) =>
+          !value.requiredStates.map((v) => String(v || "").toLowerCase()).includes(String(state || "").toLowerCase())
+      );
+      if (missing.length) {
+        hardErrors.push(
+          `node override conflict: ${cacheKey} stateMappings.${key} misses global requiredStates: ${missing.join(", ")}`
+        );
+      }
+    }
+    merged.stateMappings[key] = value;
+  });
+
+  if (Array.isArray(nodeOverride.layoutRules)) {
+    merged.layoutRules.push(...nodeOverride.layoutRules);
+  }
+  if (Array.isArray(nodeOverride.typographyRules)) {
+    merged.typographyRules.push(...nodeOverride.typographyRules);
+  }
+  if (Array.isArray(nodeOverride.interactionRules)) {
+    merged.interactionRules.push(...nodeOverride.interactionRules);
+  }
+
+  return merged;
+}
+
+function evaluateRuleSet(ruleSet, sourceText, cacheKey, hardErrors, warnings) {
+  if (!Array.isArray(ruleSet)) {
+    return;
+  }
+  ruleSet.forEach((rule, indexNo) => {
+    if (!rule || typeof rule !== "object") {
+      hardErrors.push(`rule[${indexNo}] is not object`);
+      return;
+    }
+    const pattern = String(rule.pattern || "").trim();
+    const ruleId = String(rule.id || `rule-${indexNo}`);
+    const required = rule.required !== false;
+    if (!pattern) {
+      hardErrors.push(`${ruleId}: pattern missing`);
+      return;
+    }
+    let matched = false;
+    try {
+      matched = new RegExp(pattern, "i").test(sourceText);
+    } catch {
+      hardErrors.push(`${ruleId}: invalid regex pattern '${pattern}'`);
+      return;
+    }
+    if (!matched && required) {
+      hardErrors.push(`${cacheKey}: missing required rule '${ruleId}'`);
+      return;
+    }
+    if (!matched && !required) {
+      warnings.push(`${cacheKey}: optional rule not matched '${ruleId}'`);
+    }
+  });
+}
+
 function buildContractCheckReport(options, deps) {
   const {
     cacheKey = "",
@@ -183,63 +290,6 @@ function buildContractCheckReport(options, deps) {
     };
   }
 
-  const tokenMappings = Array.isArray(contract.tokenMappings)
-    ? contract.tokenMappings
-    : [];
-  const stateMappings =
-    contract.stateMappings && typeof contract.stateMappings === "object"
-      ? contract.stateMappings
-      : {};
-
-  const mappedTokenNames = new Set();
-  const mappedTokenValues = new Set();
-  const mappedStates = new Set();
-
-  tokenMappings.forEach((mapping, indexNo) => {
-    if (!mapping || typeof mapping !== "object") {
-      hardErrors.push(`tokenMappings[${indexNo}] is not an object`);
-      return;
-    }
-
-    const tokenName = String(mapping.figmaToken || "").trim().toLowerCase();
-    const tokenValue = normalizeHexColor(String(mapping.figmaValue || ""));
-    if (tokenName) {
-      mappedTokenNames.add(tokenName);
-    }
-    if (tokenValue) {
-      mappedTokenValues.add(tokenValue);
-    }
-
-    if (mapping.required === true) {
-      const binding = mapping.projectBinding;
-      if (!binding || typeof binding !== "object") {
-        hardErrors.push(`required mapping '${mapping.id || indexNo}' missing projectBinding`);
-      }
-    }
-  });
-
-  Object.values(stateMappings).forEach((item) => {
-    if (!item || typeof item !== "object") {
-      return;
-    }
-    const requiredStates = Array.isArray(item.requiredStates)
-      ? item.requiredStates
-      : [];
-    requiredStates.forEach((state) => {
-      const normalized = String(state || "").trim().toLowerCase();
-      if (normalized) {
-        mappedStates.add(normalized);
-      }
-    });
-  });
-
-  if (!tokenMappings.length) {
-    hardErrors.push("tokenMappings is empty");
-  }
-  if (!Object.keys(stateMappings).length) {
-    hardErrors.push("stateMappings is empty");
-  }
-
   const items = index.items && typeof index.items === "object" ? index.items : {};
   const keys = Object.keys(items);
   const targetKeys = cacheKey
@@ -270,6 +320,61 @@ function buildContractCheckReport(options, deps) {
     const stateMapText = item.paths && item.paths.stateMap
       ? readTextOrEmpty(resolveMaybeAbsolutePath(item.paths.stateMap))
       : "";
+    const rawText = item.paths && item.paths.raw
+      ? readTextOrEmpty(resolveMaybeAbsolutePath(item.paths.raw))
+      : "";
+    const overridePath = require("path").join(nodeDir, "ui-override.json");
+    const nodeOverride = readJsonOrNull(overridePath);
+    const targetContract = mergeContractWithOverride(contract, nodeOverride, hardErrors, key);
+    const tokenMappings = Array.isArray(targetContract.tokenMappings)
+      ? targetContract.tokenMappings
+      : [];
+    const stateMappings =
+      targetContract.stateMappings && typeof targetContract.stateMappings === "object"
+        ? targetContract.stateMappings
+        : {};
+
+    const mappedTokenNames = new Set();
+    const mappedTokenValues = new Set();
+    const mappedStates = new Set();
+    tokenMappings.forEach((mapping, indexNo) => {
+      if (!mapping || typeof mapping !== "object") {
+        hardErrors.push(`tokenMappings[${indexNo}] is not an object`);
+        return;
+      }
+      const tokenName = String(mapping.figmaToken || "").trim().toLowerCase();
+      const tokenValue = normalizeHexColor(String(mapping.figmaValue || ""));
+      if (tokenName) {
+        mappedTokenNames.add(tokenName);
+      }
+      if (tokenValue) {
+        mappedTokenValues.add(tokenValue);
+      }
+      if (mapping.required === true) {
+        const binding = mapping.projectBinding;
+        if (!binding || typeof binding !== "object") {
+          hardErrors.push(`required mapping '${mapping.id || indexNo}' missing projectBinding`);
+        }
+      }
+    });
+    Object.values(stateMappings).forEach((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      const requiredStates = Array.isArray(entry.requiredStates) ? entry.requiredStates : [];
+      requiredStates.forEach((state) => {
+        const normalized = String(state || "").trim().toLowerCase();
+        if (normalized) {
+          mappedStates.add(normalized);
+        }
+      });
+    });
+    if (!tokenMappings.length) {
+      hardErrors.push("tokenMappings is empty");
+    }
+    if (!Object.keys(stateMappings).length) {
+      hardErrors.push("stateMappings is empty");
+    }
 
     const manifestPath = require("path").join(nodeDir, "mcp-raw", "mcp-raw-manifest.json");
     const manifest = readJsonOrNull(manifestPath);
@@ -323,6 +428,11 @@ function buildContractCheckReport(options, deps) {
         }
       });
     }
+
+    const ruleSource = `${specText}\n${stateMapText}\n${rawText}`;
+    evaluateRuleSet(targetContract.layoutRules, ruleSource, key, hardErrors, warnings);
+    evaluateRuleSet(targetContract.typographyRules, ruleSource, key, hardErrors, warnings);
+    evaluateRuleSet(targetContract.interactionRules, ruleSource, key, hardErrors, warnings);
   });
 
   if (missingTokenMappings.length) {

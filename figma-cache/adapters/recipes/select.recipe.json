@@ -1,0 +1,24 @@
+{
+  "id": "select",
+  "description": "Generic select/dropdown recipe for UI generation",
+  "structureTemplate": [
+    "trigger",
+    "panel",
+    "option",
+    "selected-indicator"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default", "expanded", "selected", "unselected"],
+    "optionalStates": ["disabled", "loading"]
+  },
+  "tokenPriority": [
+    "background",
+    "text",
+    "icon",
+    "border"
+  ],
+  "pitfalls": [
+    "Do not hardcode selected style without state linkage",
+    "Do not drop unselected state when selected exists"
+  ]
+}

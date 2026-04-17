@@ -1,0 +1,24 @@
+{
+  "id": "tabs",
+  "description": "Generic tabs recipe for segmented navigation",
+  "structureTemplate": [
+    "tab-list",
+    "tab-item",
+    "active-indicator",
+    "tab-panel"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default", "active"],
+    "optionalStates": ["hover", "disabled"]
+  },
+  "tokenPriority": [
+    "active-text",
+    "inactive-text",
+    "indicator",
+    "panel-bg"
+  ],
+  "pitfalls": [
+    "Do not render tab-panel without matching active tab state",
+    "Do not drop active indicator for selected tab"
+  ]
+}

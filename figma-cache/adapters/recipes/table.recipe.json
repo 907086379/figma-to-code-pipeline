@@ -1,0 +1,25 @@
+{
+  "id": "table",
+  "description": "Generic data-table recipe for tabular views",
+  "structureTemplate": [
+    "table-shell",
+    "header-row",
+    "body-rows",
+    "empty-state",
+    "pagination"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default", "row-hover", "row-selected"],
+    "optionalStates": ["loading", "empty", "error"]
+  },
+  "tokenPriority": [
+    "header",
+    "row-bg",
+    "row-text",
+    "divider"
+  ],
+  "pitfalls": [
+    "Do not collapse row-selected and row-hover style",
+    "Do not remove empty-state when data is unavailable"
+  ]
+}

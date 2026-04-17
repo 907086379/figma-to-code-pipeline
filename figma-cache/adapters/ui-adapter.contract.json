@@ -57,6 +57,27 @@
       }
     }
   },
+  "layoutRules": [
+    {
+      "id": "layout.hasContainer",
+      "pattern": "(container|panel|wrapper)",
+      "required": true
+    }
+  ],
+  "typographyRules": [
+    {
+      "id": "typography.hasReadableText",
+      "pattern": "(font|text|label|title)",
+      "required": true
+    }
+  ],
+  "interactionRules": [
+    {
+      "id": "interaction.hasStateOrEvent",
+      "pattern": "(state|hover|click|expanded|selected)",
+      "required": true
+    }
+  ],
   "rules": {
     "singleSourceOfTruth": true,
     "fallbackPolicy": "ask-user-when-unmapped",

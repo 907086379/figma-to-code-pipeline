@@ -92,6 +92,9 @@ function copyCursorBootstrap(options, deps) {
   const requiredExampleTemplates = [
     "examples/ui-adapter.contract.template.json",
     "examples/ui-1to1-preflight.template.md",
+    "examples/ui-override.template.json",
+    "examples/ui-execution-template.fast.md",
+    "examples/ui-execution-template.strict.md",
   ];
   requiredExampleTemplates.forEach((relPath) => {
     const absFrom = path.join(CURSOR_BOOTSTRAP_DIR, relPath);

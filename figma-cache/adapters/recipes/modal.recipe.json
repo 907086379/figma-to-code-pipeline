@@ -1,0 +1,25 @@
+{
+  "id": "modal",
+  "description": "Generic modal/dialog recipe for overlay interactions",
+  "structureTemplate": [
+    "overlay",
+    "container",
+    "header",
+    "content",
+    "actions"
+  ],
+  "stateMachine": {
+    "requiredStates": ["closed", "open"],
+    "optionalStates": ["loading", "confirming"]
+  },
+  "tokenPriority": [
+    "overlay",
+    "surface",
+    "text",
+    "action"
+  ],
+  "pitfalls": [
+    "Do not remove overlay semantics when modal opens",
+    "Do not skip action button hierarchy in footer"
+  ]
+}

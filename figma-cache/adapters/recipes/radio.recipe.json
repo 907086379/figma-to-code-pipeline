@@ -1,0 +1,23 @@
+{
+  "id": "radio",
+  "description": "Generic radio recipe for single-select controls",
+  "structureTemplate": [
+    "control",
+    "dot-indicator",
+    "label"
+  ],
+  "stateMachine": {
+    "requiredStates": ["unselected", "selected", "disabled"],
+    "optionalStates": ["error"]
+  },
+  "tokenPriority": [
+    "control-border",
+    "control-fill",
+    "dot",
+    "label-text"
+  ],
+  "pitfalls": [
+    "Do not mix selected/unselected semantics",
+    "Do not remove keyboard focus style"
+  ]
+}

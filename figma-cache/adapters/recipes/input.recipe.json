@@ -1,0 +1,24 @@
+{
+  "id": "input",
+  "description": "Generic text-input recipe for form controls",
+  "structureTemplate": [
+    "label",
+    "input-shell",
+    "prefix-or-suffix",
+    "helper-text"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default", "focused", "error", "disabled"],
+    "optionalStates": ["readonly", "success"]
+  },
+  "tokenPriority": [
+    "border",
+    "text",
+    "placeholder",
+    "background"
+  ],
+  "pitfalls": [
+    "Do not merge error state into default style",
+    "Do not ignore focused outline or border token"
+  ]
+}

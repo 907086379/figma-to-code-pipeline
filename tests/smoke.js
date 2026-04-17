@@ -6,9 +6,15 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { normalizeUiFacts } = require("../figma-cache/js/ui-facts-normalizer");
 
 const root = path.join(__dirname, "..");
 const bin = path.join(root, "bin", "figma-cache.js");
+const uiPreflightScript = path.join(root, "scripts", "ui-preflight.js");
+const uiAuditScript = path.join(root, "scripts", "ui-1to1-audit.js");
+const uiAggregateScript = path.join(root, "scripts", "ui-report-aggregate.js");
+const uiAutoAcceptanceScript = path.join(root, "scripts", "ui-auto-acceptance.js");
+const crossProjectE2EScript = path.join(root, "scripts", "cross-project-e2e.js");
 
 const TEST_URL = "https://www.figma.com/file/abcABCd0123456789vWxyZ/x?node-id=1-2";
 const FILE_KEY = "abcABCd0123456789vWxyZ";
@@ -38,6 +44,71 @@ function runWithEnv(args, extraEnv) {
 function runInDir(args, cwd, extraEnv) {
   return run(args, {
     cwd,
+    env: {
+      ...process.env,
+      ...(extraEnv || {}),
+    },
+  });
+}
+
+function runUiPreflight(args, cwd, extraEnv) {
+  const cliArgs = args ? ` ${args}` : "";
+  return execSync(`node "${uiPreflightScript}"${cliArgs}`, {
+    cwd: cwd || root,
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...(extraEnv || {}),
+    },
+  });
+}
+
+function runUiAudit(args, cwd, extraEnv) {
+  const cliArgs = args ? ` ${args}` : "";
+  return execSync(`node "${uiAuditScript}"${cliArgs}`, {
+    cwd: cwd || root,
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...(extraEnv || {}),
+    },
+  });
+}
+
+function runUiAggregate(args, cwd, extraEnv) {
+  const cliArgs = args ? ` ${args}` : "";
+  return execSync(`node "${uiAggregateScript}"${cliArgs}`, {
+    cwd: cwd || root,
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...(extraEnv || {}),
+    },
+  });
+}
+
+function runUiAutoAcceptance(args, cwd, extraEnv) {
+  const cliArgs = args ? ` ${args}` : "";
+  return execSync(`node "${uiAutoAcceptanceScript}"${cliArgs}`, {
+    cwd: cwd || root,
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...(extraEnv || {}),
+    },
+  });
+}
+
+function runCrossProjectE2E(args, cwd, extraEnv) {
+  const cliArgs = args ? ` ${args}` : "";
+  return execSync(`node "${crossProjectE2EScript}"${cliArgs}`, {
+    cwd: cwd || root,
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...process.env,
       ...(extraEnv || {}),
@@ -388,6 +459,598 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
   });
 }
 
+// ui-preflight: negative should fail when cacheKey does not exist
+{
+  const { env } = createTempEnv("figma-cache-smoke-ui-preflight-missing-key-");
+  const err = expectThrow(
+    () =>
+      runUiPreflight("--cacheKey=missing#1-2", root, {
+        ...env,
+      }),
+    "ui-preflight should fail when cacheKey does not exist"
+  );
+  assert.strictEqual(err.status, 2, "ui-preflight should fail with exit code 2");
+}
+
+// ui-preflight: negative should fail when raw evidence missing
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-ui-preflight-missing-evidence-");
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  const rawPath = path.join(cacheDir, "files", FILE_KEY, "nodes", SAFE_NODE_ID, "raw.json");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.coverageSummary = raw.coverageSummary || {};
+  raw.coverageSummary.evidence = {
+    layout: [],
+    text: [],
+    tokens: [],
+    interactions: [],
+    states: [],
+    accessibility: [],
+  };
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default", "expanded", "selected", "unselected"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const err = expectThrow(
+    () =>
+      runUiPreflight(`--cacheKey=${CACHE_KEY} --contract=${contractPath}`, root, {
+        ...env,
+      }),
+    "ui-preflight should fail when coverage evidence is missing"
+  );
+  assert.strictEqual(err.status, 2, "ui-preflight should fail with exit code 2");
+}
+
+// ui-preflight: positive should pass and write default report
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-ui-preflight-ok-");
+  const { nodeDir } = ensureMcpEvidence(cacheDir);
+  runWithEnv(
+    `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default", "expanded", "selected", "unselected"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const rawPath = path.join(nodeDir, "raw.json");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.coverageSummary = raw.coverageSummary || {};
+  raw.coverageSummary.evidence = raw.coverageSummary.evidence || {};
+  raw.coverageSummary.evidence.layout = ["meta.json"];
+  raw.coverageSummary.evidence.text = ["spec.md"];
+  raw.coverageSummary.evidence.tokens = ["spec.md"];
+  raw.coverageSummary.evidence.interactions = ["spec.md"];
+  raw.coverageSummary.evidence.states = ["state-map.md"];
+  raw.coverageSummary.evidence.accessibility = ["spec.md"];
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  const output = runUiPreflight(`--cacheKey=${CACHE_KEY} --contract=${contractPath}`, root, env);
+  const result = JSON.parse(output.trim());
+  assert.strictEqual(result.ok, true, "ui-preflight should pass for complete item");
+
+  const reportPath = path.join(root, "figma-cache", "reports", "ui-preflight-report.json");
+  assert.ok(fs.existsSync(reportPath), "ui-preflight should write default report file");
+}
+
+// ui-preflight: strict profile should treat warning as blocking
+{
+  const { env } = createTempEnv("figma-cache-smoke-ui-preflight-strict-profile-");
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [{ figmaToken: "x", figmaValue: "#305AFE", projectBinding: { type: "literal", value: "#305AFE" } }],
+        stateMappings: { select: { requiredStates: ["default"] } },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  const err = expectThrow(
+    () =>
+      runUiPreflight(`--cacheKey=${CACHE_KEY} --contract=${contractPath}`, root, {
+        ...env,
+        FIGMA_UI_PROFILE: "strict",
+      }),
+    "strict profile should block preflight warnings"
+  );
+  assert.strictEqual(err.status, 2, "strict profile warning-block should exit with code 2");
+}
+
+// ui-audit: positive should generate score report and pass default threshold
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-ui-audit-ok-");
+  const { nodeDir } = ensureMcpEvidence(cacheDir);
+  runWithEnv(
+    `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default", "expanded", "selected", "unselected"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const rawPath = path.join(nodeDir, "raw.json");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.coverageSummary = raw.coverageSummary || {};
+  raw.coverageSummary.evidence = raw.coverageSummary.evidence || {};
+  raw.coverageSummary.evidence.layout = ["meta.json"];
+  raw.coverageSummary.evidence.text = ["spec.md"];
+  raw.coverageSummary.evidence.tokens = ["spec.md"];
+  raw.coverageSummary.evidence.interactions = ["spec.md"];
+  raw.coverageSummary.evidence.states = ["state-map.md"];
+  raw.coverageSummary.evidence.accessibility = ["spec.md"];
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  const output = runUiAudit(`--cacheKey=${CACHE_KEY} --contract=${contractPath} --min-score=85`, root, env);
+  const result = JSON.parse(output.trim());
+  assert.strictEqual(result.ok, true, "ui-audit should pass when score meets threshold");
+  assert.ok(result.summary.score.total >= 85, "ui-audit score should meet threshold");
+  assert.ok(result.summary.recipesTotal >= 10, "ui-audit should load recipe library");
+  assert.ok(
+    typeof result.summary.recipesMatchedItems === "number",
+    "ui-audit should report recipe matching coverage"
+  );
+
+  const reportPath = path.join(root, "figma-cache", "reports", "ui-1to1-report.json");
+  assert.ok(fs.existsSync(reportPath), "ui-audit should write default report file");
+}
+
+// ui-audit: negative should fail when threshold is too high
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-ui-audit-threshold-");
+  const { nodeDir } = ensureMcpEvidence(cacheDir);
+  runWithEnv(
+    `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default", "expanded", "selected", "unselected"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const rawPath = path.join(nodeDir, "raw.json");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.coverageSummary = raw.coverageSummary || {};
+  raw.coverageSummary.evidence = raw.coverageSummary.evidence || {};
+  raw.coverageSummary.evidence.layout = ["meta.json"];
+  raw.coverageSummary.evidence.text = ["spec.md"];
+  raw.coverageSummary.evidence.tokens = ["spec.md"];
+  raw.coverageSummary.evidence.interactions = ["spec.md"];
+  raw.coverageSummary.evidence.states = ["state-map.md"];
+  raw.coverageSummary.evidence.accessibility = ["spec.md"];
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  const err = expectThrow(
+    () => runUiAudit(`--cacheKey=${CACHE_KEY} --contract=${contractPath} --min-score=101`, root, env),
+    "ui-audit should fail when score threshold is too high"
+  );
+  assert.strictEqual(err.status, 2, "ui-audit threshold failure should exit with code 2");
+}
+
+// ui-audit: strict profile should require target path
+{
+  const { cacheDir, env } = createTempEnv("figma-cache-smoke-ui-audit-strict-target-");
+  ensureMcpEvidence(cacheDir);
+  runWithEnv(
+    `upsert "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [{ figmaToken: "x", figmaValue: "#305AFE", projectBinding: { type: "literal", value: "#305AFE" } }],
+        stateMappings: { select: { requiredStates: ["default"] } },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  const err = expectThrow(
+    () =>
+      runUiAudit(`--cacheKey=${CACHE_KEY} --contract=${contractPath}`, root, {
+        ...env,
+        FIGMA_UI_PROFILE: "strict",
+      }),
+    "strict profile should require target path in audit"
+  );
+  assert.strictEqual(err.status, 2, "strict profile audit target requirement should exit with code 2");
+}
+
+// ui-facts-normalizer: should normalize cross-source facts in generic shape
+{
+  const facts = normalizeUiFacts({
+    specText: "- Button Label\n- Brand/Primary 500: #305AFE\n",
+    stateMapText: "## 状态\n| state | visual |\n| --- | --- |\n| default | blue |\n| selected | dark |\n",
+    rawJson: {
+      interactions: { events: ["click", "hover"], notes: "no TODO" },
+      coverageSummary: { evidence: { text: ["spec.md"] } },
+    },
+    variableDefsJson: {
+      colors: {
+        primary500: "#305AFE",
+      },
+    },
+    entryReady: true,
+    evidenceReady: true,
+  });
+  assert.strictEqual(facts.dimensions.layoutReady, true, "normalized facts should keep layout readiness");
+  assert.ok(facts.facts.tokens.length >= 1, "normalized facts should include tokens from multiple sources");
+  assert.ok(facts.facts.states.includes("default"), "normalized facts should parse state rows");
+  assert.ok(facts.facts.interactions.includes("click"), "normalized facts should parse interaction events");
+}
+
+// recipes: should include top-10 high-frequency component recipes
+{
+  const recipesDir = path.join(root, "figma-cache", "adapters", "recipes");
+  const recipeFiles = fs
+    .readdirSync(recipesDir)
+    .filter((name) => name.endsWith(".recipe.json") || name.endsWith(".json"));
+  assert.ok(recipeFiles.length >= 10, "recipe assets should cover at least top-10 component types");
+}
+
+// contract-check: should enforce layout/typography/interaction rules
+{
+  const { env } = createTempEnv("figma-cache-smoke-contract-rules-");
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  const nodeDir = path.join(env.FIGMA_CACHE_DIR, "files", FILE_KEY, "nodes", SAFE_NODE_ID);
+  const specPath = path.join(nodeDir, "spec.md");
+  const stateMapPath = path.join(nodeDir, "state-map.md");
+  const rawPath = path.join(nodeDir, "raw.json");
+  fs.writeFileSync(specPath, "# Spec\n- container\n- label\n", "utf8");
+  fs.writeFileSync(stateMapPath, "## States\n| state | visual |\n| --- | --- |\n| default | blue |\n", "utf8");
+  const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+  raw.interactions = { notes: "click to expand" };
+  fs.writeFileSync(rawPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: { select: { requiredStates: ["default"] } },
+        layoutRules: [{ id: "layout.hasContainer", pattern: "container", required: true }],
+        typographyRules: [{ id: "typo.hasLabel", pattern: "label", required: true }],
+        interactionRules: [{ id: "interaction.hasClick", pattern: "click", required: true }],
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  runWithEnv(`contract-check --cacheKey=${CACHE_KEY}`, {
+    ...env,
+    FIGMA_CACHE_ADAPTER_CONTRACT: contractPath,
+  });
+
+  fs.writeFileSync(specPath, "# Spec\n- only text\n", "utf8");
+  const err = expectThrow(
+    () =>
+      runWithEnv(`contract-check --cacheKey=${CACHE_KEY}`, {
+        ...env,
+        FIGMA_CACHE_ADAPTER_CONTRACT: contractPath,
+      }),
+    "contract-check should fail when required rules are not matched"
+  );
+  assert.strictEqual(err.status, 2, "contract rule mismatch should exit with code 2");
+}
+
+// contract-check: should detect node override conflict with global contract
+{
+  const { env } = createTempEnv("figma-cache-smoke-contract-override-conflict-");
+  runWithEnv(
+    `ensure "${TEST_URL}" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`,
+    env
+  );
+  const nodeDir = path.join(env.FIGMA_CACHE_DIR, "files", FILE_KEY, "nodes", SAFE_NODE_ID);
+  const contractPath = path.join(env.FIGMA_CACHE_DIR, "adapters", "ui-adapter.contract.json");
+  fs.mkdirSync(path.dirname(contractPath), { recursive: true });
+  fs.writeFileSync(
+    contractPath,
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            id: "token.blue",
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            required: true,
+            projectBinding: { type: "literal", value: "#305AFE" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default", "selected"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(nodeDir, "ui-override.json"),
+    JSON.stringify(
+      {
+        tokenMappings: [
+          {
+            figmaToken: "Textr Team Blue/Textr Team Blue 500",
+            figmaValue: "#305AFE",
+            projectBinding: { type: "literal", value: "#123456" },
+          },
+        ],
+        stateMappings: {
+          select: {
+            requiredStates: ["default"],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  const err = expectThrow(
+    () =>
+      runWithEnv(`contract-check --cacheKey=${CACHE_KEY}`, {
+        ...env,
+        FIGMA_CACHE_ADAPTER_CONTRACT: contractPath,
+      }),
+    "contract-check should fail on override/global conflict"
+  );
+  assert.strictEqual(err.status, 2, "override conflict should exit with code 2");
+}
+
+// ui aggregate: should output quality summary json
+{
+  const output = runUiAggregate("", root, {});
+  const report = JSON.parse(output.trim());
+  assert.ok(report.metrics, "aggregate report should include metrics");
+  const summaryPath = path.join(root, "figma-cache", "reports", "ui-quality-summary.json");
+  assert.ok(fs.existsSync(summaryPath), "aggregate report should be written to default path");
+}
+
+// ui auto acceptance: reports-only should pass with healthy reports
+{
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-auto-accept-"));
+  const preflightPath = path.join(tempRoot, "preflight.json");
+  const auditPath = path.join(tempRoot, "audit.json");
+  const summaryPath = path.join(tempRoot, "summary.json");
+  fs.writeFileSync(
+    preflightPath,
+    JSON.stringify(
+      {
+        ok: true,
+        summary: { blockingCount: 0 },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  fs.writeFileSync(
+    auditPath,
+    JSON.stringify(
+      {
+        ok: true,
+        summary: {
+          score: { total: 95 },
+          warningCount: 0,
+          diffCount: 0,
+        },
+        options: {
+          targetPath: "src/components/Example.tsx",
+        },
+        warnings: [],
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+  fs.writeFileSync(
+    summaryPath,
+    JSON.stringify(
+      {
+        trend: { status: "healthy" },
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const output = runUiAutoAcceptance(
+    `--reports-only --preflight-report=${preflightPath} --audit-report=${auditPath} --summary-report=${summaryPath}`,
+    root,
+    {}
+  );
+  const result = JSON.parse(output.trim());
+  assert.strictEqual(result.ok, true, "auto acceptance should pass for healthy reports");
+}
+
+// package files: should include ui auto acceptance scripts for cross-project usage
+{
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const files = Array.isArray(pkg.files) ? pkg.files : [];
+  assert.ok(files.includes("scripts/ui-auto-acceptance.js"), "package files should include ui-auto-acceptance script");
+  assert.ok(files.includes("scripts/ui-preflight.js"), "package files should include ui-preflight script");
+  assert.ok(files.includes("scripts/ui-1to1-audit.js"), "package files should include ui-audit script");
+  assert.ok(files.includes("scripts/ui-report-aggregate.js"), "package files should include ui-report-aggregate script");
+  assert.ok(files.includes("scripts/cross-project-e2e.js"), "package files should include cross-project-e2e script");
+}
+
+// cross-project-e2e: should fail fast when target project is missing
+{
+  const err = expectThrow(
+    () => runCrossProjectE2E("--target=src/components/Example.tsx --cacheKey=abc#1:2", root, {}),
+    "cross-project-e2e should reject missing --target-project"
+  );
+  assert.strictEqual(err.status, 2, "cross-project-e2e missing target-project should exit with code 2");
+}
+
+// cross-project-e2e: should fail fast when target path is missing in single mode
+{
+  const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cross-target-project-"));
+  const err = expectThrow(
+    () => runCrossProjectE2E(`--target-project=${tempProject} --cacheKey=abc#1:2`, root, {}),
+    "cross-project-e2e should reject missing --target in single mode"
+  );
+  assert.strictEqual(err.status, 2, "cross-project-e2e missing target should exit with code 2");
+}
+
+// cross-project-e2e: should fail when batch-file payload is empty
+{
+  const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cross-batch-empty-"));
+  const batchFilePath = path.join(tempProject, "batch.json");
+  fs.writeFileSync(batchFilePath, "[]\n", "utf8");
+  const err = expectThrow(
+    () => runCrossProjectE2E(`--target-project=${tempProject} --batch-file=${batchFilePath}`, root, {}),
+    "cross-project-e2e should reject empty batch-file payload"
+  );
+  assert.strictEqual(err.status, 2, "cross-project-e2e empty batch-file should exit with code 2");
+}
+
 // cursor init: should ensure figma-cache.config.js and cleanup safe legacy example
 {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cursor-init-"));
@@ -428,6 +1091,24 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
     "examples",
     "ui-1to1-preflight.template.md"
   );
+  const fastTemplatePath = path.join(
+    tempRoot,
+    "cursor-bootstrap",
+    "examples",
+    "ui-execution-template.fast.md"
+  );
+  const strictTemplatePath = path.join(
+    tempRoot,
+    "cursor-bootstrap",
+    "examples",
+    "ui-execution-template.strict.md"
+  );
+  const overrideTemplatePath = path.join(
+    tempRoot,
+    "cursor-bootstrap",
+    "examples",
+    "ui-override.template.json"
+  );
   assert.ok(
     fs.existsSync(contractTemplatePath),
     "cursor init should copy ui-adapter contract template to project"
@@ -436,6 +1117,9 @@ assert.ok(exitCode > 0, "unknown command should exit non-zero");
     fs.existsSync(preflightTemplatePath),
     "cursor init should copy ui preflight template to project"
   );
+  assert.ok(fs.existsSync(fastTemplatePath), "cursor init should copy fast execution template");
+  assert.ok(fs.existsSync(strictTemplatePath), "cursor init should copy strict execution template");
+  assert.ok(fs.existsSync(overrideTemplatePath), "cursor init should copy override template");
 
   const keepExistingOutput = runInDir("cursor init", tempRoot, env);
   const keepResult = JSON.parse(keepExistingOutput.split(/\r?\n\r?\n/)[0]);

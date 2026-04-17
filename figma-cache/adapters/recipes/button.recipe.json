@@ -1,0 +1,24 @@
+{
+  "id": "button",
+  "description": "Generic clickable button recipe",
+  "structureTemplate": [
+    "button-shell",
+    "label",
+    "leading-icon",
+    "trailing-icon"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default", "hover", "active", "disabled"],
+    "optionalStates": ["loading", "focus-visible"]
+  },
+  "tokenPriority": [
+    "background",
+    "text",
+    "icon",
+    "border"
+  ],
+  "pitfalls": [
+    "Do not lose disabled contrast",
+    "Do not collapse hover and active states"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "card",
+  "description": "Generic card recipe for content containers",
+  "structureTemplate": [
+    "card-shell",
+    "header",
+    "body",
+    "footer"
+  ],
+  "stateMachine": {
+    "requiredStates": ["default"],
+    "optionalStates": ["hover", "selected", "disabled"]
+  },
+  "tokenPriority": [
+    "surface",
+    "border",
+    "title-text",
+    "body-text"
+  ],
+  "pitfalls": [
+    "Do not remove spacing hierarchy between header/body/footer",
+    "Do not flatten card elevation when hover state exists"
+  ]
+}

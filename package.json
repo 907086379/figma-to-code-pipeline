@@ -31,8 +31,17 @@
                   "figma-cache/js/backfill-cli.js",
                   "figma-cache/js/project-config.js",
                   "figma-cache/js/contract-check-cli.js",
+                  "figma-cache/js/ui-facts-normalizer.js",
                   "figma-cache/js/upsert-core.js",
-                  "figma-cache/docs/*.md"
+                  "scripts/ui-profile.js",
+                  "scripts/ui-preflight.js",
+                  "scripts/ui-1to1-audit.js",
+                  "scripts/ui-report-aggregate.js",
+                  "scripts/ui-auto-acceptance.js",
+                  "scripts/cross-project-e2e.js",
+                  "figma-cache/adapters/recipes/*.json",
+                  "figma-cache/docs/*.md",
+                  "figma-cache/docs/ui-1to1-report.schema.json"
               ],
     "publishConfig":  {
                           "registry":  "https://registry.npmjs.org/"
@@ -61,7 +70,14 @@
                     "cursor:shadow:check":  "node scripts/check-cursor-shadow.js",
                     "docs:encoding:check":  "node scripts/check-doc-encoding.js",
                     "figma:cache:mobile:spec":  "node scripts/mobile/generate-mobile-spec.js",
-                    "figma:ui:gate":  "npm run figma:cache:validate \u0026\u0026 npm run cursor:shadow:check \u0026\u0026 npm test",
+                    "figma:ui:preflight":  "node scripts/ui-preflight.js",
+                    "figma:ui:audit":  "node scripts/ui-1to1-audit.js",
+                    "figma:ui:report:aggregate":  "node scripts/ui-report-aggregate.js",
+                    "figma:ui:accept":  "node scripts/ui-auto-acceptance.js",
+                    "figma:ui:e2e:cross":  "node scripts/cross-project-e2e.js",
+                    "figma:ui:gate":  "npm run figma:ui:preflight \u0026\u0026 npm run figma:ui:audit -- --min-score=85 \u0026\u0026 npm run figma:cache:validate \u0026\u0026 npm run cursor:shadow:check \u0026\u0026 npm test",
+                    "figma:ui:gate:pr":  "npm run figma:ui:preflight \u0026\u0026 npm run figma:cache:validate",
+                    "figma:ui:gate:main":  "npm run figma:ui:preflight \u0026\u0026 npm run figma:ui:audit -- --min-score=90 \u0026\u0026 npm run figma:ui:report:aggregate \u0026\u0026 npm run figma:cache:validate \u0026\u0026 npm run cursor:shadow:check \u0026\u0026 npm test",
                     "figma:cache:contract:check":  "node bin/figma-cache.js contract-check",
                     "preflight:shell":  "node scripts/preflight-shell.js --warn",
                     "preflight:shell:strict":  "node scripts/preflight-shell.js --strict"

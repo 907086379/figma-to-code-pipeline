@@ -1,0 +1,24 @@
+{
+  "id": "tooltip",
+  "description": "Generic tooltip recipe for contextual hints",
+  "structureTemplate": [
+    "trigger",
+    "bubble",
+    "arrow",
+    "content"
+  ],
+  "stateMachine": {
+    "requiredStates": ["hidden", "visible"],
+    "optionalStates": ["delayed", "pinned"]
+  },
+  "tokenPriority": [
+    "bubble-bg",
+    "text",
+    "shadow",
+    "arrow"
+  ],
+  "pitfalls": [
+    "Do not show tooltip persistently in hidden state",
+    "Do not detach arrow color from bubble color"
+  ]
+}

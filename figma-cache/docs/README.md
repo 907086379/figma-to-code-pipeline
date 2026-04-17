@@ -70,7 +70,7 @@ npm run figma:cache:config
 - `npm run figma:ui:audit -- --min-score=85`
 - `npm run figma:ui:report:aggregate`
 - `npm run figma:ui:accept -- --target=<componentPath>`
-- `npm run figma:ui:e2e:cross -- --target-project=E:/Work/vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=E:/Work/vue-demo/src/components/YourComponent.vue`
+- `npm run figma:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
 - `npm run figma:ui:gate`
 - `npm run figma:ui:gate:pr`
 - `npm run figma:ui:gate:main`
@@ -80,6 +80,15 @@ npm run figma:cache:config
 > 注意：`ensure` 默认职责是“写索引 + 生成骨架文件”，不是 MCP 拉取器。  
 > 当 `upsert/ensure` 传 `--source=figma-mcp` 且未显式允许骨架模式时，CLI 会先执行 MCP 原始证据门禁（缺失即失败，退出码 2）。
 > 正确流程是先由 Agent/Figma MCP 获取最小调用集并写入 `mcp-raw/`，再执行 `upsert/ensure` 与 `validate`。
+
+### Fresh 重生成回归（推荐）
+
+- 目标项目推荐一条命令：`npm run figma:workflow:fresh:one-shot`（删 -> 等文件 -> 验收 + build）
+- 备选拆分：
+  - `npm run figma:workflow:fresh:start`（删除 target，并要求“缺失目标失败”）
+  - `npm run figma:workflow:fresh:verify`（Agent 重生成后验收通过）
+  - `npm run figma:workflow:fresh:wait-verify`（仅等待 target 出现后自动验收）
+- `cross-project-e2e` 默认开启真实组件链路保护：`target` 缺失或出现 `code-level comparison skipped` 会直接失败
 
 ### UI preflight（P0 门禁）
 
@@ -139,24 +148,6 @@ npm run figma:cache:config
   - audit score 不低于阈值
   - 必须提供并命中 `targetPath`
   - warning/diff 需在阈值内（可通过 `--max-warnings`、`--max-diffs` 调整）
-
-### 跨项目联调（toolchain -> 业务项目）
-
-- 命令：`npm run figma:ui:e2e:cross`
-- 自动流程：
-  1) 在当前 toolchain 项目执行 `npm pack`
-  2) 在目标项目安装本地 tgz
-  3) 在目标项目执行 `ui-auto-acceptance`
-  4) 输出目标项目报告路径与汇总指标
-- 推荐参数：
-  - `--target-project=E:/Work/vue-demo`
-  - `--fileKey=<fileKey>` + `--nodeId=9277-28772`（会自动标准化为 `9277:28772`）
-  - 或直接 `--cacheKey=<fileKey#9277:28772>`
-- 可选增强：
-  - `--auto-ensure-on-miss`：cache miss 时自动触发 figma-mcp ensure
-  - `--allow-skeleton-with-figma-mcp`：允许 skeleton 写入（仅建议应急）
-  - `--batch-file=<json>`：批量执行，多节点一次联调
-  - `--fix-loop=<N>`：失败自动重试 N 轮（重试前会补 contract 并刷新缓存）
 
 ### 严格 validate 规则（默认）
 

@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-04-17T00:00:00.000Z",
+  "profile": "standard",
+  "inputs": {
+    "preflightReport": "figma-cache/reports/runtime/ui-preflight-report.json",
+    "auditReport": "figma-cache/reports/runtime/ui-1to1-report.json"
+  },
+  "metrics": {
+    "checkedItems": 1,
+    "preflightBlockingRate": 0,
+    "auditPassRate": 1,
+    "firstPassAcceptedRate": 1,
+    "averageAuditScore": 90,
+    "reworkRoundsEstimate": 0
+  },
+  "trend": {
+    "status": "healthy",
+    "notes": [
+      "sample report"
+    ]
+  }
+}

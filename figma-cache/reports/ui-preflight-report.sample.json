@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "generatedAt": "2026-04-17T00:00:00.000Z",
+  "summary": {
+    "checkedItems": 1,
+    "blockingCount": 0,
+    "warningCount": 0,
+    "warningBlockingCount": 0,
+    "allowWarn": false,
+    "profile": "standard"
+  },
+  "options": {
+    "cacheKey": "fileKey#nodeId",
+    "contractPath": "figma-cache/adapters/ui-adapter.contract.json",
+    "reportPath": "figma-cache/reports/runtime/ui-preflight-report.json"
+  },
+  "items": []
+}

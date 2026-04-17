@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "generatedAt": "2026-04-17T00:00:00.000Z",
+  "summary": {
+    "checkedItems": 1,
+    "score": {
+      "total": 90,
+      "layout": 90,
+      "text": 90,
+      "token": 90,
+      "state": 90,
+      "interaction": 90
+    },
+    "blockingCount": 0,
+    "warningCount": 0,
+    "diffCount": 0,
+    "minScore": 85,
+    "profile": "standard",
+    "recipesTotal": 10,
+    "recipesMatchedItems": 1
+  },
+  "options": {
+    "cacheKey": "fileKey#nodeId",
+    "targetPath": "src/components/Demo.vue",
+    "contractPath": "figma-cache/adapters/ui-adapter.contract.json",
+    "reportPath": "figma-cache/reports/runtime/ui-1to1-report.json",
+    "recipesDir": "figma-cache/adapters/recipes"
+  },
+  "blocking": [],
+  "warnings": [],
+  "diffs": [],
+  "items": []
+}

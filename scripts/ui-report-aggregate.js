@@ -8,7 +8,7 @@ const { getUiProfileConfig } = require("./ui-profile");
 
 const ROOT = process.cwd();
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
-const DEFAULT_OUTPUT_PATH = "figma-cache/reports/ui-quality-summary.json";
+const DEFAULT_OUTPUT_PATH = "figma-cache/reports/runtime/ui-quality-summary.json";
 
 function resolveMaybeAbsolutePath(input) {
   if (!input) {
@@ -62,10 +62,10 @@ function run() {
   const options = parseArgs(process.argv.slice(2));
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
   const preflightPath = resolveMaybeAbsolutePath(
-    options.preflightReport || path.join(cacheDir, "reports", "ui-preflight-report.json")
+    options.preflightReport || path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json")
   );
   const auditPath = resolveMaybeAbsolutePath(
-    options.auditReport || path.join(cacheDir, "reports", "ui-1to1-report.json")
+    options.auditReport || path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json")
   );
   const outputPath = resolveMaybeAbsolutePath(options.output);
   const profileConfig = getUiProfileConfig();

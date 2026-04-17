@@ -4,14 +4,9 @@
 
 ## Unreleased
 
-- 暂无
-
-## 2.0.4（2026-04-17）
-
-- 新增 `figma:ui:preflight` / `figma:ui:audit` / `figma:ui:report:aggregate` / `figma:ui:accept` 与跨项目 `figma:ui:e2e:cross`，补齐 UI 门禁与自动验收链路。
-- 新增 `figma-cache/js/ui-facts-normalizer.js` 与前10类 recipe 资产，审计可输出命中信息并保持可选命中不破坏通用性。
-- 扩展 `contract-check`：支持 `layoutRules` / `typographyRules` / `interactionRules` 与 `ui-override.json` 冲突检测。
-- 补充 fast/strict 执行模板与文档手册，并纳入首版 `ui-preflight/audit/quality-summary` 质量报告基线。
+- `figma:ui:e2e:cross` 增加真实组件链路防呆：single/batch 模式下 `--target` 文件不存在时直接失败。
+- `figma:ui:e2e:cross` 默认阻断 `code-level comparison skipped`（可用 `--allow-skipped-code-level-comparison` 显式放行兼容旧流程），避免未绑定真实组件路径时出现假阳性通过。
+- `tests/smoke.js` 补充 cross-project-e2e 缺失目标文件的失败用例，覆盖上述行为。
 
 ## 2.0.3（2026-04-16）
 

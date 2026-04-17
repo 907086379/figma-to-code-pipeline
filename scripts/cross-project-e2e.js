@@ -16,6 +16,21 @@ function resolveMaybeAbsolutePath(input) {
   return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
 }
 
+/** Batch / CLI `target` paths are relative to the target business project root (not toolchain cwd). */
+function resolveTargetInProject(rawTarget, targetProject) {
+  if (!rawTarget) {
+    return "";
+  }
+  const trimmed = String(rawTarget).trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (path.isAbsolute(trimmed)) {
+    return path.normalize(trimmed);
+  }
+  return path.join(targetProject, trimmed);
+}
+
 function parseArgs(argv) {
   const options = {
     targetProject: "",
@@ -34,6 +49,9 @@ function parseArgs(argv) {
     completeness: "layout,text,tokens,interactions,states,accessibility",
     batchFile: "",
     fixLoop: 0,
+    emitAgentTaskOnFail: false,
+    agentTaskPath: "",
+    allowSkippedCodeLevelComparison: false,
   };
 
   argv.forEach((arg) => {
@@ -103,6 +121,18 @@ function parseArgs(argv) {
     if (arg.startsWith("--fix-loop=")) {
       const n = Number(arg.split("=").slice(1).join("=").trim());
       options.fixLoop = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      return;
+    }
+    if (arg === "--emit-agent-task-on-fail") {
+      options.emitAgentTaskOnFail = true;
+      return;
+    }
+    if (arg.startsWith("--agent-task-path=")) {
+      options.agentTaskPath = arg.split("=").slice(1).join("=").trim();
+      return;
+    }
+    if (arg === "--allow-skipped-code-level-comparison") {
+      options.allowSkippedCodeLevelComparison = true;
     }
   });
 
@@ -162,6 +192,63 @@ function readJsonOrNull(absPath) {
 
 function normalizeSlash(input) {
   return String(input || "").replace(/\\/g, "/");
+}
+
+function writeAgentTask(targetProject, options, payload) {
+  const defaultPath = path.join(targetProject, "agent-task.md");
+  const taskPath = options.agentTaskPath
+    ? resolveMaybeAbsolutePath(options.agentTaskPath)
+    : defaultPath;
+  const lines = [];
+  lines.push("# Agent Task: UI E2E Recovery");
+  lines.push("");
+  lines.push("## Goal");
+  lines.push("Fix target project implementation so ui acceptance passes.");
+  lines.push("");
+  lines.push("## Constraints");
+  lines.push("- Must run ui acceptance after code changes.");
+  lines.push("- Do not bypass by lowering thresholds unless explicitly requested.");
+  lines.push("- Prioritize real component/contract/recipe fixes.");
+  lines.push("");
+  lines.push("## Context");
+  lines.push(`- targetProject: ${normalizeSlash(payload.targetProject || "")}`);
+  lines.push(`- mode: ${payload.mode || "single"}`);
+  lines.push(`- profile: ${payload.profile || "standard"}`);
+  lines.push(`- autoEnsureOnMiss: ${payload.autoEnsureOnMiss ? "true" : "false"}`);
+  lines.push(`- fixLoop: ${Number(payload.fixLoop || 0)}`);
+  lines.push("");
+  lines.push("## Cases");
+  (payload.cases || []).forEach((entry, idx) => {
+    lines.push(`### Case ${idx + 1}`);
+    lines.push(`- cacheKey: ${entry.cacheKey || ""}`);
+    lines.push(`- targetPath: ${normalizeSlash(entry.targetPath || "")}`);
+    lines.push(`- reason: ${entry.reason || "unknown"}`);
+    if (entry.attemptLogs && entry.attemptLogs.length) {
+      lines.push("- attemptLogs:");
+      entry.attemptLogs.forEach((log) => {
+        lines.push(
+          `  - attempt ${log.attempt}: ${log.ok ? "ok" : "fail"}${log.reason ? ` (${log.reason})` : ""}`
+        );
+      });
+    }
+    lines.push("");
+  });
+  lines.push("## Required Command");
+  lines.push("Run this command in toolchain repo after fixes:");
+  lines.push("");
+  lines.push("```bash");
+  lines.push(payload.retryCommand || "npm run figma:ui:e2e:cross -- --target-project=<...>");
+  lines.push("```");
+  lines.push("");
+  lines.push("## Completion Criteria");
+  lines.push("- e2e command exits with code 0");
+  lines.push("- summaryStatus is healthy");
+  lines.push("- no unresolved blocking items");
+  lines.push("");
+
+  fs.mkdirSync(path.dirname(taskPath), { recursive: true });
+  fs.writeFileSync(taskPath, `${lines.join("\n")}\n`, "utf8");
+  return taskPath;
 }
 
 function parseCacheKey(cacheKey) {
@@ -256,9 +343,12 @@ function runSingleCase(input, context) {
   if (!cacheKey) {
     throw new Error("batch item missing cacheKey or (fileKey + nodeId)");
   }
-  const targetPath = item.target ? resolveMaybeAbsolutePath(item.target) : "";
+  const targetPath = item.target ? resolveTargetInProject(item.target, targetProject) : "";
   if (!targetPath) {
     throw new Error(`batch item ${cacheKey} missing target path`);
+  }
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`batch item ${cacheKey} target path does not exist: ${targetPath}`);
   }
 
   const acceptArgs = [
@@ -301,6 +391,18 @@ function runSingleCase(input, context) {
       try {
         acceptanceJson = JSON.parse(acceptanceOutput);
       } catch {}
+      if (
+        !options.allowSkippedCodeLevelComparison &&
+        acceptanceJson &&
+        Array.isArray(acceptanceJson.warnings) &&
+        acceptanceJson.warnings.some((entry) =>
+          /code-level comparison skipped/i.test(String(entry || ""))
+        )
+      ) {
+        throw new Error(
+          `acceptance produced skipped code-level comparison for ${cacheKey}; target linkage is invalid`
+        );
+      }
       attemptLogs.push({ attempt, ok: true });
       return {
         ok: true,
@@ -339,9 +441,13 @@ function run() {
   }
   const isBatchMode = !!options.batchFile;
   if (!isBatchMode) {
-    const targetPath = options.target ? resolveMaybeAbsolutePath(options.target) : "";
+    const targetPath = options.target ? resolveTargetInProject(options.target, targetProject) : "";
     if (!targetPath) {
       console.error("cross-project-e2e failed: --target is required for real component validation");
+      process.exit(FAIL_EXIT_CODE);
+    }
+    if (!fs.existsSync(targetPath)) {
+      console.error(`cross-project-e2e failed: --target path does not exist: ${targetPath}`);
       process.exit(FAIL_EXIT_CODE);
     }
     const cacheKey = resolveCacheKey(options);
@@ -352,6 +458,7 @@ function run() {
   }
 
   let tarballPath = "";
+  let taskPayload = null;
   try {
     tarballPath = npmPackAndGetTarball();
     runCommand(`npm i -D "${tarballPath}"`, targetProject);
@@ -404,11 +511,26 @@ function run() {
         caseFailures.push({
           index: indexNo,
           cacheKey: entry && (entry.cacheKey || resolveCacheKey(entry)),
+          targetPath: entry && entry.target,
+          attemptLogs: [],
           reason: error.message,
         });
       }
     });
     if (caseFailures.length) {
+      taskPayload = {
+        targetProject,
+        mode: isBatchMode ? "batch" : "single",
+        profile: options.profile || "standard",
+        autoEnsureOnMiss: options.autoEnsureOnMiss,
+        fixLoop: options.fixLoop,
+        cases: caseFailures,
+        retryCommand: `npm run figma:ui:e2e:cross -- --target-project=${normalizeSlash(
+          targetProject
+        )}${options.batchFile ? ` --batch-file=${normalizeSlash(options.batchFile)}` : ""}${
+          options.autoEnsureOnMiss ? " --auto-ensure-on-miss" : ""
+        }${options.fixLoop ? ` --fix-loop=${options.fixLoop}` : ""}`,
+      };
       throw new Error(`batch cases failed: ${JSON.stringify(caseFailures)}`);
     }
 
@@ -424,9 +546,9 @@ function run() {
       completeness: options.completeness,
       tarballPath,
       reports: {
-        preflight: path.join(reportBase, "ui-preflight-report.json"),
-        audit: path.join(reportBase, "ui-1to1-report.json"),
-        summary: path.join(reportBase, "ui-quality-summary.json"),
+        preflight: path.join(reportBase, "runtime", "ui-preflight-report.json"),
+        audit: path.join(reportBase, "runtime", "ui-1to1-report.json"),
+        summary: path.join(reportBase, "runtime", "ui-quality-summary.json"),
       },
       cases: caseResults,
     };
@@ -438,8 +560,42 @@ function run() {
     }
     console.log(JSON.stringify(output, null, 2));
   } catch (error) {
+    let taskPath = "";
+    if (options.emitAgentTaskOnFail) {
+      try {
+        const payload =
+          taskPayload ||
+          ({
+            targetProject,
+            mode: isBatchMode ? "batch" : "single",
+            profile: options.profile || "standard",
+            autoEnsureOnMiss: options.autoEnsureOnMiss,
+            fixLoop: options.fixLoop,
+            cases: [
+              {
+                cacheKey: resolveCacheKey(options),
+                targetPath: options.target,
+                reason: error.message,
+              },
+            ],
+            retryCommand: `npm run figma:ui:e2e:cross -- --target-project=${normalizeSlash(
+              targetProject
+            )}${options.batchFile ? ` --batch-file=${normalizeSlash(options.batchFile)}` : ""}${
+              options.cacheKey ? ` --cacheKey=${options.cacheKey}` : ""
+            }${options.fileKey ? ` --fileKey=${options.fileKey}` : ""}${
+              options.nodeId ? ` --nodeId=${options.nodeId}` : ""
+            }${options.target ? ` --target=${normalizeSlash(options.target)}` : ""}${
+              options.autoEnsureOnMiss ? " --auto-ensure-on-miss" : ""
+            }${options.fixLoop ? ` --fix-loop=${options.fixLoop}` : ""} --emit-agent-task-on-fail`,
+          });
+        taskPath = writeAgentTask(targetProject, options, payload);
+      } catch {}
+    }
     console.error("cross-project-e2e failed:");
     console.error(`- ${error.message}`);
+    if (taskPath) {
+      console.error(`- agent task emitted: ${normalizeSlash(taskPath)}`);
+    }
     process.exit(FAIL_EXIT_CODE);
   } finally {
     if (tarballPath && !options.keepPackage) {

@@ -10,7 +10,7 @@ const ROOT = process.cwd();
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
 const INDEX_FILE_NAME = process.env.FIGMA_CACHE_INDEX_FILE || "index.json";
 const DEFAULT_CONTRACT_PATH = "figma-cache/adapters/ui-adapter.contract.json";
-const DEFAULT_REPORT_PATH = "figma-cache/reports/ui-preflight-report.json";
+const DEFAULT_REPORT_PATH = "figma-cache/reports/runtime/ui-preflight-report.json";
 const BLOCKING_EXIT_CODE = 2;
 
 function normalizeSlash(input) {

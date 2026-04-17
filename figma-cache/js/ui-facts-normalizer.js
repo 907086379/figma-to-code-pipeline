@@ -67,31 +67,42 @@ function isPlaceholderText(input) {
 function extractSpecFacts(specText) {
   const textFacts = [];
   const tokenFacts = [];
-  const tokenRegex = /-\s*([^:\n]+?)\s*:\s*(#[0-9a-fA-F]{3,8})/g;
-  String(specText || "")
-    .split(/\r?\n/)
-    .forEach((line) => {
-      const t = line.trim();
-      if (!t.startsWith("-")) {
-        return;
-      }
-      let hasToken = false;
-      let match = null;
-      while ((match = tokenRegex.exec(t))) {
-        hasToken = true;
+  /** 同一行内可多次出现 name:#hex，每行重置 lastIndex，避免 /g 状态串行污染 */
+  const tokenPairRe = /-\s*([^:\n]+?)\s*:\s*(#[0-9a-fA-F]{3,8})/g;
+  const lines = String(specText || "").split(/\r?\n/);
+  let inTextSection = false;
+  let inTokenSection = false;
+
+  lines.forEach((rawLine) => {
+    const t = rawLine.trim();
+    if (/^##\s+/i.test(t)) {
+      inTextSection = /(Text|文案)/i.test(t);
+      inTokenSection = /(Tokens|Token|变量|样式)/i.test(t);
+      return;
+    }
+    if (!t.startsWith("-")) {
+      return;
+    }
+    tokenPairRe.lastIndex = 0;
+    let hasTokenPair = false;
+    let match = null;
+    while ((match = tokenPairRe.exec(t)) !== null) {
+      hasTokenPair = true;
+      if (inTokenSection) {
         tokenFacts.push({
           name: String(match[1] || "").trim(),
           value: String(match[2] || "").trim(),
           source: "spec.md",
         });
       }
-      if (!hasToken) {
-        const text = t.replace(/^-+\s*/, "").trim();
-        if (text) {
-          textFacts.push(text);
-        }
+    }
+    if (inTextSection && !hasTokenPair) {
+      const text = t.replace(/^-+\s*/, "").trim();
+      if (text) {
+        textFacts.push(text);
       }
-    });
+    }
+  });
   return {
     textFacts: dedupeStrings(textFacts),
     tokenFacts: dedupeTokens(tokenFacts),

@@ -125,7 +125,6 @@ npm run figma:ui:preflight
 npm run figma:ui:audit -- --min-score=85
 npm run figma:ui:report:aggregate
 npm run figma:ui:accept -- --target=src/components/YourComponent.tsx
-npm run figma:ui:e2e:cross -- --target-project=E:/Work/vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=E:/Work/vue-demo/src/components/YourComponent.vue
 npm run figma:ui:gate
 npm run figma:ui:gate:pr
 npm run figma:ui:gate:main
@@ -144,11 +143,8 @@ UI preflight/gate 说明：
 - `figma:ui:gate` 会先跑 preflight + audit（默认阈值 `85`），再串联 `validate`、`cursor:shadow:check` 与 `npm test`
 - `figma:ui:report:aggregate` 会聚合 preflight + audit 报告，输出 `figma-cache/reports/ui-quality-summary.json`
 - `figma:ui:accept` 是一键自动验收：自动跑 preflight + audit + aggregate，并按效果阈值直接返回 pass/fail（退出码）
-- `figma:ui:e2e:cross` 是跨项目联调：自动 `npm pack` 当前包 -> 安装到目标项目 -> 执行自动验收 -> 回收报告路径与摘要
-- 支持 `--auto-ensure-on-miss`：cache miss 时自动尝试 `--source=figma-mcp ensure`
-- 支持 `--batch-file=<json>`：批量节点联调并汇总结果（单条失败即整体失败）
-- 支持 `--fix-loop=<N>`：失败后自动执行自修复重试（补 contract / 刷新缓存后重跑）
 - CI 建议矩阵：`figma:ui:gate:pr`（PR 最低门槛）与 `figma:ui:gate:main`（主干严格门槛）
+- `figma:ui:e2e:cross` 现默认启用“真实组件链路保护”：`--target` 不存在或验收出现 `code-level comparison skipped` 会直接失败，避免“未绑定真实组件但通过”的假阳性；如需兼容历史流程可显式传 `--allow-skipped-code-level-comparison`
 
 UI profile 分层（P3）：
 

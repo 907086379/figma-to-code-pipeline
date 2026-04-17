@@ -105,13 +105,13 @@ function buildReportPaths(options) {
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
   return {
     preflight: resolveMaybeAbsolutePath(
-      options.preflightReport || path.join(cacheDir, "reports", "ui-preflight-report.json")
+      options.preflightReport || path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json")
     ),
     audit: resolveMaybeAbsolutePath(
-      options.auditReport || path.join(cacheDir, "reports", "ui-1to1-report.json")
+      options.auditReport || path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json")
     ),
     summary: resolveMaybeAbsolutePath(
-      options.summaryReport || path.join(cacheDir, "reports", "ui-quality-summary.json")
+      options.summaryReport || path.join(cacheDir, "reports", "runtime", "ui-quality-summary.json")
     ),
   };
 }

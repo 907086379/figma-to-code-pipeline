@@ -1,0 +1,37 @@
+{
+  "ok": false,
+  "generatedAt": "2026-04-17T03:04:45.601Z",
+  "summary": {
+    "checkedItems": 1,
+    "blockingCount": 0,
+    "warningCount": 2,
+    "warningBlockingCount": 2,
+    "allowWarn": false,
+    "profile": "strict"
+  },
+  "options": {
+    "cacheKey": "abcABCd0123456789vWxyZ#1:2",
+    "contractPath": "C:/Users/90708/AppData/Local/Temp/figma-cache-smoke-ui-preflight-strict-profile-esxNNH/figma-cache/adapters/ui-adapter.contract.json",
+    "reportPath": "E:/Work/figma-cache-v1/figma-cache/reports/ui-preflight-report.json"
+  },
+  "items": [
+    {
+      "cacheKey": "abcABCd0123456789vWxyZ#1:2",
+      "source": "manual",
+      "blocking": [],
+      "warnings": [
+        "spec.md contains TODO placeholder",
+        "state-map.md contains TODO placeholder"
+      ],
+      "checks": {
+        "cacheItemExists": true,
+        "entryFilesExist": true,
+        "coverageEvidenceReady": true,
+        "contractExists": true,
+        "tokenMappingReady": true,
+        "stateMappingReady": true,
+        "mcpRawReady": true
+      }
+    }
+  ]
+}

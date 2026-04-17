@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-04-17T03:04:47.320Z",
+  "profile": "standard",
+  "inputs": {
+    "preflightReport": "E:\\Work\\figma-cache-v1\\figma-cache\\reports\\ui-preflight-report.json",
+    "auditReport": "E:\\Work\\figma-cache-v1\\figma-cache\\reports\\ui-1to1-report.json"
+  },
+  "metrics": {
+    "checkedItems": 1,
+    "preflightBlockingRate": 0,
+    "auditPassRate": 0,
+    "firstPassAcceptedRate": 0,
+    "averageAuditScore": 94,
+    "reworkRoundsEstimate": 1
+  },
+  "trend": {
+    "status": "needs-attention",
+    "notes": [
+      "Use this file as weekly baseline input for team QA review.",
+      "Track blockingRate and averageAuditScore trend in CI artifacts."
+    ]
+  }
+}

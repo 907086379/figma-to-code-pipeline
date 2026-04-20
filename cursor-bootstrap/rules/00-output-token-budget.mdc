@@ -26,4 +26,4 @@ alwaysApply: true
 ## 模板维护约定（强制）
 - `cursor-bootstrap` 是规则/技能模板唯一手写来源。
 - 仓库内 `.cursor/*` 视为镜像产物，不作为手工编辑入口。
-- 模板变更后执行 `npm run cursor:shadow:sync`，再提交。
+- 模板变更后执行 `npm run verify:cursor:sync`，再提交。

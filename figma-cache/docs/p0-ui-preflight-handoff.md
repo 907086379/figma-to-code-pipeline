@@ -11,8 +11,8 @@
 当前项目已有：
 
 - `figma-cache validate`：索引/证据完整性门禁
-- `figma:cache:contract:check`：token/state 映射门禁
-- `figma:ui:gate`：聚合门禁（当前无 preflight）
+- `fc:contract:check`：token/state 映射门禁
+- `fc:ui:gate`：聚合门禁（当前无 preflight）
 
 缺口：
 
@@ -21,10 +21,10 @@
 
 P0 目标：
 
-1. 新增 `figma:ui:preflight` 命令（脚本 `scripts/ui-preflight.js`）。
+1. 新增 `fc:ui:preflight` 命令（脚本 `scripts/ui-preflight.js`）。
 2. 生成结构化报告（默认输出到 `figma-cache/reports/ui-preflight-report.json`）。
 3. 存在阻断项时返回非零退出码（建议 `2`）。
-4. 将 preflight 接到 `figma:ui:gate` 前置步骤。
+4. 将 preflight 接到 `fc:ui:gate` 前置步骤。
 5. 增加 smoke 覆盖与文档说明。
 
 ---
@@ -48,8 +48,8 @@ P0 目标：
 ### 3.2 修改
 
 - `package.json`
-  - 新增 script：`figma:ui:preflight`
-  - 调整 script：`figma:ui:gate` 前置执行 preflight
+  - 新增 script：`fc:ui:preflight`
+  - 调整 script：`fc:ui:gate` 前置执行 preflight
 - `tests/smoke.js`
   - 增加 preflight 正向/负向用例
 - `README.md`
@@ -142,11 +142,11 @@ warning（不阻断，可积累）：
 调整 `package.json`：
 
 - 新增：
-  - `"figma:ui:preflight": "node scripts/ui-preflight.js"`
+  - `"fc:ui:preflight": "node scripts/ui-preflight.js"`
 - 调整：
-  - `"figma:ui:gate": "npm run figma:ui:preflight && npm run figma:cache:validate && npm run cursor:shadow:check && npm test"`
+  - `"fc:ui:gate": "npm run fc:ui:preflight && npm run fc:validate && npm run verify:cursor && npm test"`
 
-> 说明：P0 不强制在 gate 中跑 `figma:cache:contract:check`，避免对旧项目立即破坏性升级。可在 P0.5 再接入。
+> 说明：P0 不强制在 gate 中跑 `fc:contract:check`，避免对旧项目立即破坏性升级。可在 P0.5 再接入。
 
 ---
 
@@ -165,11 +165,11 @@ warning（不阻断，可积累）：
 
 按顺序执行：
 
-1. `npm run cursor:shadow:sync`
-2. `npm run cursor:shadow:check`
+1. `npm run verify:cursor:sync`
+2. `npm run verify:cursor`
 3. `npm test`
-4. `npm run figma:ui:preflight`（至少跑一次）
-5. `npm run figma:ui:gate`
+4. `npm run fc:ui:preflight`（至少跑一次）
+5. `npm run fc:ui:gate`
 
 ---
 
@@ -184,10 +184,10 @@ warning（不阻断，可积累）：
 ## 9. 建议提交信息（给下一个 Agent）
 
 ```text
-feat(gate): 新增 figma ui preflight 结构化门禁并接入 figma:ui:gate
+feat(gate): 新增 figma ui preflight 结构化门禁并接入 fc:ui:gate
 
 - 新增 scripts/ui-preflight.js，输出 ui-preflight-report.json 并对阻断项返回 exit code 2。
-- 在 package.json 增加 figma:ui:preflight，且将 figma:ui:gate 前置 preflight 执行。
+- 在 package.json 增加 fc:ui:preflight，且将 fc:ui:gate 前置 preflight 执行。
 - 扩展 smoke 覆盖 preflight 的正负场景与报告落盘断言。
 - 同步 README 与 figma-cache/docs/README.md，补充 preflight 使用说明与报告字段。
 ```

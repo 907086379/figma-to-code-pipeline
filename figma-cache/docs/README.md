@@ -4,12 +4,12 @@
 
 ## 从 npm 包接入业务项目（顺序一览）
 
-若通过 **`figma-cache-toolchain`** 安装（而非整仓拷贝本目录），推荐顺序为：
+若通过 **`figma-to-code-pipeline`** 安装（而非整仓拷贝本目录），推荐顺序为：
 
-1. `npm i -D figma-cache-toolchain`
+1. `npm i -D figma-to-code-pipeline`
 2. `npx figma-cache cursor init`（写入 `.cursor/` 等，并刷新根目录 **`AGENT-SETUP-PROMPT.md`**）
-3. 在 Cursor 中 **`@AGENT-SETUP-PROMPT.md`** 并让 Agent 按文档执行（栈配置、Adapter、`figma:cache:*` scripts 等）
-4. **`npm run figma:cache:init`**（若尚无 script，用 **`npx figma-cache init`**）→ 生成 **`figma-cache/index.json`**
+3. 在 Cursor 中 **`@AGENT-SETUP-PROMPT.md`** 并让 Agent 按文档执行（栈配置、Adapter、`fc:*` scripts 等）
+4. **`npm run fc:init`**（若尚无 script，用 **`npx figma-cache init`**）→ 生成 **`figma-cache/index.json`**
 
 说明：**`cursor init`** 与 **`figma-cache init`** 是两件事；后者才是本地缓存数据目录与空索引。仓库根 **`README.md`**（npm 包首页文档）中有与上述一致的「四步」说明。
 
@@ -43,40 +43,40 @@
 查看当前配置：
 
 ```bash
-npm run figma:cache:config
+npm run fc:config
 ```
 
 PowerShell 示例（设置默认 flow，减少重复参数）：
 
 ```powershell
 $env:FIGMA_DEFAULT_FLOW="sip-calling-phase1"
-npm run figma:cache:config
+npm run fc:config
 ```
 
 ## 常用命令（通常由 agent 自动执行）
 
-- `npm run figma:cache:init`
-- `npm run figma:cache:get -- "<figma-url>"`
-- `npm run figma:cache:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`
-- `npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`
-- `npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens --allow-skeleton-with-figma-mcp`（仅写骨架，后续仍需 `validate` 通过）
-- `npm run figma:cache:ensure -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens --allow-skeleton-with-figma-mcp`（仅写骨架，后续仍需 `validate` 通过）
+- `npm run fc:init`
+- `npm run fc:get -- "<figma-url>"`
+- `npm run fc:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`
+- `npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`
+- `npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens --allow-skeleton-with-figma-mcp`（仅写骨架，后续仍需 `validate` 通过）
+- `npm run fc:ensure -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens --allow-skeleton-with-figma-mcp`（仅写骨架，后续仍需 `validate` 通过）
 - 若不传 `--completeness`，CLI 默认即使用：`layout,text,tokens,interactions,states,accessibility`
 - 自动追加 `flow` 仅限白名单：关系关键词（关联/流程/跳转/前后页/上一步/下一步/分支/链路/路径/from/to/next/branch），或同轮/断续多链接且明确先后/串联意图
 - 单链接且无关系意图、仅视觉微调、仅资产导出时，不自动追加 `flow`
 - 若自动追加了 `flow`，Agent 输出中必须记录触发原因：`关键词命中` 或 `多链接串联意图`
-- `npm run figma:cache:validate`
-- `npm run figma:ui:preflight`
-- `npm run figma:ui:audit -- --min-score=85`
-- `npm run figma:ui:report:aggregate`
-- `npm run figma:ui:accept -- --target=<componentPath>`
-- `npm run figma:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
-- `npm run figma:ui:gate`
-- `npm run figma:ui:gate:pr`
-- `npm run figma:ui:gate:main`
-- `npm run figma:cache:budget`（默认 `--mcp-only`）
-- `npm run figma:cache:stale`
-- `npm run figma:cache:backfill`
+- `npm run fc:validate`
+- `npm run fc:ui:preflight`
+- `npm run fc:ui:audit -- --min-score=85`
+- `npm run fc:ui:report:aggregate`
+- `npm run fc:ui:accept -- --target=<componentPath>`
+- `npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
+- `npm run fc:ui:gate`
+- `npm run fc:ui:gate:pr`
+- `npm run fc:ui:gate:main`
+- `npm run fc:budget`（默认 `--mcp-only`）
+- `npm run fc:stale`
+- `npm run fc:backfill`
 > 注意：`ensure` 默认职责是“写索引 + 生成骨架文件”，不是 MCP 拉取器。  
 > 当 `upsert/ensure` 传 `--source=figma-mcp` 且未显式允许骨架模式时，CLI 会先执行 MCP 原始证据门禁（缺失即失败，退出码 2）。
 > 正确流程是先由 Agent/Figma MCP 获取最小调用集并写入 `mcp-raw/`，再执行 `upsert/ensure` 与 `validate`。
@@ -92,20 +92,20 @@ npm run figma:cache:config
 
 ### UI preflight（P0 门禁）
 
-- `npm run figma:ui:preflight`：读取 `index.json`、adapter contract 与节点关键文件，输出结构化报告到 `figma-cache/reports/ui-preflight-report.json`
+- `npm run fc:ui:preflight`：读取 `index.json`、adapter contract 与节点关键文件，输出结构化报告到 `figma-cache/reports/ui-preflight-report.json`
 - 支持参数：`--cacheKey=<fileKey#nodeId>`、`--contract=<path>`、`--report=<path>`、`--allow-warn`
 - 阻断项返回退出码 `2`：包括 cacheKey 不存在、关键文件缺失、coverage evidence 不完整、contract 缺失或映射为空、`source=figma-mcp` 时缺失 `mcp-raw-manifest.json`
 - warning 项（不阻断）会提示 `spec.md`/`state-map.md` 中的 TODO 占位
 
 ### UI gate（含 preflight 前置）
 
-- `npm run figma:ui:gate` 当前执行链：`figma:ui:preflight` -> `figma:ui:audit -- --min-score=85` -> `figma:cache:validate` -> `cursor:shadow:check` -> `npm test`
-- `npm run figma:ui:gate:pr`：PR 最低门槛（preflight + validate）
-- `npm run figma:ui:gate:main`：主干门槛（preflight + audit90 + aggregate + validate + test）
+- `npm run fc:ui:gate`：`verify:static` → `fc:ui:preflight` → `fc:ui:audit -- --min-score=85` → `fc:validate` → `test:node`
+- `npm run fc:ui:gate:pr`：PR 最低门槛（`verify:static` + preflight + validate）
+- `npm run fc:ui:gate:main`：主干门槛（`verify:static` + preflight + audit90 + aggregate + validate + test:node）
 
 ### UI 1:1 audit（P1 质量评分）
 
-- `npm run figma:ui:audit -- --cacheKey=<fileKey#nodeId> --target=<componentPath> --min-score=85`
+- `npm run fc:ui:audit -- --cacheKey=<fileKey#nodeId> --target=<componentPath> --min-score=85`
 - 默认报告：`figma-cache/reports/ui-1to1-report.json`
 - 报告结构遵循：`figma-cache/docs/ui-1to1-report.schema.json`
 - 评分字段：`score.total/layout/text/token/state/interaction`
@@ -136,12 +136,12 @@ npm run figma:cache:config
 - `fast`：audit 默认阈值 70
 - `standard`：audit 默认阈值 85
 - `strict`：preflight warning 计入阻断、audit 默认阈值 92 且要求 `--target`
-- 报告聚合：`npm run figma:ui:report:aggregate`
+- 报告聚合：`npm run fc:ui:report:aggregate`
   - 输出：`figma-cache/reports/ui-quality-summary.json`
 
 ### 一键自动验收（效果导向）
 
-- `npm run figma:ui:accept -- --cacheKey=<fileKey#nodeId> --target=<componentPath> --min-score=90`
+- `npm run fc:ui:accept -- --cacheKey=<fileKey#nodeId> --target=<componentPath> --min-score=90`
 - 自动流程：preflight -> audit -> aggregate -> 验收判定
 - 默认严格判定：
   - preflight 必须无 blocking
@@ -158,7 +158,7 @@ npm run figma:cache:config
 
 ### 预算统计（token/调用）
 
-- `npm run figma:cache:budget`：输出 MCP 节点预算汇总（调用次数、原始文件体积、token 代理值）。
+- `npm run fc:budget`：输出 MCP 节点预算汇总（调用次数、原始文件体积、token 代理值）。
 - 预算字段统一使用 `tokenProxyBytes`（基于 `mcp-raw-get-design-context.txt` 文件大小估算）。
 - 兼容字段 `tokenProxyChars` 仍保留，便于旧脚本平滑迁移。
 
@@ -168,12 +168,12 @@ npm run figma:cache:config
 
 常用命令：
 
-- `npm run figma:cache:flow:init -- --id=sip-calling-flow --title="SIP Calling"`
-- `npm run figma:cache:flow:add-node -- --flow=sip-calling-flow "<figma-url>"`（要求 `items` 已存在；如需同时创建缓存项可加 `--ensure`）
-- `npm run figma:cache:flow:link -- --flow=sip-calling-flow "<fromUrl>" "<toUrl>" --type=next_step`
-- `npm run figma:cache:flow:chain -- --flow=sip-calling-flow "<url1>" "<url2>" "<url3>" --type=related`
-- `npm run figma:cache:flow:show -- --flow=sip-calling-flow`
-- `npm run figma:cache:flow:mermaid -- --flow=sip-calling-flow`
+- `npm run fc:flow:init -- --id=sip-calling-flow --title="SIP Calling"`
+- `npm run fc:flow:add-node -- --flow=sip-calling-flow "<figma-url>"`（要求 `items` 已存在；如需同时创建缓存项可加 `--ensure`）
+- `npm run fc:flow:link -- --flow=sip-calling-flow "<fromUrl>" "<toUrl>" --type=next_step`
+- `npm run fc:flow:chain -- --flow=sip-calling-flow "<url1>" "<url2>" "<url3>" --type=related`
+- `npm run fc:flow:show -- --flow=sip-calling-flow`
+- `npm run fc:flow:mermaid -- --flow=sip-calling-flow`
 
 说明：
 
@@ -194,7 +194,7 @@ npm run figma:cache:config
 - 如果你准备移植“纯净版”（删除 `index.json` 和 `files/`），可先执行：
 
 ```bash
-npm run figma:cache:init
+npm run fc:init
 ```
 
 - 该命令只创建空索引，不会创建任何节点缓存文件。
@@ -203,7 +203,7 @@ npm run figma:cache:init
 
 ## 复制 `figma-cache/` 接入（不安装 npm 包）
 
-将脚本与规范**整目录**拷入业务仓库、**不**通过 `npm i figma-cache-toolchain` 安装时：
+将脚本与规范**整目录**拷入业务仓库、**不**通过 `npm i figma-to-code-pipeline` 安装时：
 
 - **建议**拷贝：`figma-cache.js` 与本目录下规范 `.md`；业务数据 `files/`、`index.json` 可按需不带，在新项目执行 **`figma-cache init`** 再 **`ensure`** 重建。
 - **可选**：仓库根薄封装 `bin/figma-cache.js`；也可始终 `node figma-cache/figma-cache.js <子命令>`。
@@ -218,32 +218,32 @@ npm run figma:cache:init
 
 ```json
 {
-  "figma:cache:normalize": "node figma-cache/figma-cache.js normalize",
-  "figma:cache:get": "node figma-cache/figma-cache.js get",
-  "figma:cache:upsert": "node figma-cache/figma-cache.js upsert",
-  "figma:cache:ensure": "node figma-cache/figma-cache.js ensure",
-  "figma:cache:validate": "node figma-cache/figma-cache.js validate",
-  "figma:cache:budget": "node figma-cache/figma-cache.js budget --mcp-only",
-  "figma:cache:stale": "node figma-cache/figma-cache.js stale",
-  "figma:cache:backfill": "node figma-cache/figma-cache.js backfill",
-  "figma:cache:init": "node figma-cache/figma-cache.js init",
-  "figma:cache:config": "node figma-cache/figma-cache.js config",
-  "figma:cache:flow:init": "node figma-cache/figma-cache.js flow init",
-  "figma:cache:flow:add-node": "node figma-cache/figma-cache.js flow add-node",
-  "figma:cache:flow:link": "node figma-cache/figma-cache.js flow link",
-  "figma:cache:flow:chain": "node figma-cache/figma-cache.js flow chain",
-  "figma:cache:flow:show": "node figma-cache/figma-cache.js flow show",
-  "figma:cache:flow:mermaid": "node figma-cache/figma-cache.js flow mermaid",
-  "figma:cache:cursor:init": "node figma-cache/figma-cache.js cursor init"
+  "fc:normalize": "node figma-cache/figma-cache.js normalize",
+  "fc:get": "node figma-cache/figma-cache.js get",
+  "fc:upsert": "node figma-cache/figma-cache.js upsert",
+  "fc:ensure": "node figma-cache/figma-cache.js ensure",
+  "fc:validate": "node figma-cache/figma-cache.js validate",
+  "fc:budget": "node figma-cache/figma-cache.js budget --mcp-only",
+  "fc:stale": "node figma-cache/figma-cache.js stale",
+  "fc:backfill": "node figma-cache/figma-cache.js backfill",
+  "fc:init": "node figma-cache/figma-cache.js init",
+  "fc:config": "node figma-cache/figma-cache.js config",
+  "fc:flow:init": "node figma-cache/figma-cache.js flow init",
+  "fc:flow:add-node": "node figma-cache/figma-cache.js flow add-node",
+  "fc:flow:link": "node figma-cache/figma-cache.js flow link",
+  "fc:flow:chain": "node figma-cache/figma-cache.js flow chain",
+  "fc:flow:show": "node figma-cache/figma-cache.js flow show",
+  "fc:flow:mermaid": "node figma-cache/figma-cache.js flow mermaid",
+  "fc:cursor:init": "node figma-cache/figma-cache.js cursor init"
 }
 ```
 
-**方式 B**（`npm i -D figma-cache-toolchain`）：`package.json` 的 `bin` 提供 `figma-cache`，`npm run` 里可写 `figma-cache <子命令>`（走 `node_modules/.bin`）。本工具链**自身仓库根**在无自依赖时部分 npm 版本不会把当前包写入 `.bin`，故可用 `node bin/figma-cache.js <子命令>` 做自检，与方式 B 等价。
+**方式 B**（`npm i -D figma-to-code-pipeline`）：`package.json` 的 `bin` 提供 `figma-cache`，`npm run` 里可写 `figma-cache <子命令>`（走 `node_modules/.bin`）。本工具链**自身仓库根**在无自依赖时部分 npm 版本不会把当前包写入 `.bin`，故可用 `node bin/figma-cache.js <子命令>` 做自检，与方式 B 等价。
 
 ## 接入后自检
 
-1. `npm run figma:cache:config`（或 `npx figma-cache config`）
-2. `npm run figma:cache:validate`
+1. `npm run fc:config`（或 `npx figma-cache config`）
+2. `npm run fc:validate`
 3. 用真实链接试一次 `get` / `ensure`
 
 ## 环境变量（完整列表）
@@ -277,14 +277,14 @@ npm run figma:cache:init
 扫描历史文档中的 Figma 链接并补入缓存索引。
 
 ```bash
-npm run figma:cache:backfill
+npm run fc:backfill
 ```
 
 默认扫描目录由 `FIGMA_ITERATIONS_DIR` 决定（默认 `library/figma-iterations`）。完成后建议：
 
 ```bash
-npm run figma:cache:validate
-npm run figma:cache:stale
+npm run fc:validate
+npm run fc:stale
 ```
 
 ## Adapter 与 postEnsure
@@ -303,7 +303,7 @@ npm run figma:cache:stale
 
 ## 包维护者
 
-维护 **`figma-cache-toolchain` 源码**时：见**仓库根** `README.md`（发布）与 `CHANGELOG.md`；修改 `cursor-bootstrap/`（含 `AGENT-SETUP-PROMPT.md`）或 CLI 后 bump 版本并 `npm publish`，消费方 `cursor init` 才会刷新到最新任务书。将 Core 抽成独立包、semver 与 `ctx` 约定等，可在发包前对照 `CHANGELOG` 与 `npm publish --dry-run`。
+维护 **`figma-to-code-pipeline` 源码**时：见**仓库根** `README.md`（发布）与 `CHANGELOG.md`；修改 `cursor-bootstrap/`（含 `AGENT-SETUP-PROMPT.md`）或 CLI 后 bump 版本并 `npm publish`，消费方 `cursor init` 才会刷新到最新任务书。将 Core 抽成独立包、semver 与 `ctx` 约定等，可在发包前对照 `CHANGELOG` 与 `npm publish --dry-run`。
 
 
 

@@ -22,11 +22,11 @@ mobile-adapter/
 
 ## 快速开始
 
-1. 先确保目标节点已进入本地缓存（`figma:cache:get` / `figma:cache:upsert`）。
+1. 先确保目标节点已进入本地缓存（`fc:get` / `fc:upsert`）。
 2. 运行：
 
 ```bash
-npm run figma:cache:mobile:spec -- --url "<figma-url>" --platform all
+npm run fc:mobile:spec -- --url "<figma-url>" --platform all
 ```
 
 3. 产物默认写入：`figma-cache/mobile-specs/<cacheKey>/mobile-spec.json`

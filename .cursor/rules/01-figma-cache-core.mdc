@@ -43,5 +43,5 @@ alwaysApply: true
 ## 低 token 与编码（强制）
 - 用户可见回复禁止粘贴 MCP 长原文；除非用户明确要求。
 - 进度默认 0-1 条；仅阻塞或失败时补充。
-- 文档与脚本写入统一 UTF-8（无 BOM）；PowerShell 禁用 bash heredoc，写后回读并执行必要校验（如 `npm run docs:encoding:check`）。
+- 文档与脚本写入统一 UTF-8（无 BOM）；PowerShell 禁用 bash heredoc，写后回读并执行必要校验（如 `npm run verify:docs`）。
 

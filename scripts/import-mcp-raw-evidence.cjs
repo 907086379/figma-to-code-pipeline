@@ -16,11 +16,14 @@
  * Notes:
  * - Writes to: figma-cache/files/<fileKey>/nodes/<safeNodeId>/mcp-raw/
  * - Generates: mcp-raw-manifest.json with sha256 + byte sizes
+ * - get_design_context: normalized via sanitize-design-context-for-cache.cjs
+ *   (MCP trailers like SUPER CRITICAL, token prose, component-doc blobs; variable-font style noise).
  */
 
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { sanitizeDesignContextTextForCache } = require("./sanitize-design-context-for-cache.cjs");
 
 function sha256Utf8(text) {
   return crypto.createHash("sha256").update(String(text || ""), "utf8").digest("hex");
@@ -108,7 +111,7 @@ function main() {
   };
 
   const contents = {
-    get_design_context: readUtf8(srcDesign),
+    get_design_context: sanitizeDesignContextTextForCache(readUtf8(srcDesign)),
     get_metadata: readUtf8(srcMeta),
     get_variable_defs: readUtf8(srcVars),
   };

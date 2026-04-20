@@ -7,8 +7,8 @@
 - 托管层（bootstrap 管理）
   - 来源：`cursor-bootstrap/*`
   - 镜像：`.cursor/rules/*`、`.cursor/skills/*`
-  - 同步入口：`npm run cursor:shadow:sync`
-  - 校验入口：`npm run cursor:shadow:check`
+  - 同步入口：`npm run verify:cursor:sync`
+  - 校验入口：`npm run verify:cursor`
 
 - 本地层（项目私有）
   - 规则命名：`.cursor/rules/local-*.mdc`
@@ -25,8 +25,8 @@
 
 1) 改托管规则：
 - 仅修改 `cursor-bootstrap/*`
-- 执行 `npm run cursor:shadow:sync`
-- 执行 `npm run cursor:shadow:check`
+- 执行 `npm run verify:cursor:sync`
+- 执行 `npm run verify:cursor`
 
 2) 改本地规则：
 - 仅修改 `.cursor/rules/local-*.mdc` 或 `.cursor/skills/local-*`

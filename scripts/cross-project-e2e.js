@@ -238,7 +238,7 @@ function writeAgentTask(targetProject, options, payload) {
   lines.push("Run this command in toolchain repo after fixes:");
   lines.push("");
   lines.push("```bash");
-  lines.push(payload.retryCommand || "npm run figma:ui:e2e:cross -- --target-project=<...>");
+  lines.push(payload.retryCommand || "npm run fc:ui:e2e:cross -- --target-project=<...>");
   lines.push("```");
   lines.push("");
   lines.push("## Completion Criteria");
@@ -284,7 +284,7 @@ function ensureCacheViaFigmaMcp(targetProject, cacheKey, options) {
   const cliPath = path.join(
     targetProject,
     "node_modules",
-    "figma-cache-toolchain",
+    "figma-to-code-pipeline",
     "bin",
     "figma-cache.js"
   );
@@ -316,7 +316,7 @@ function bootstrapContractIfNeeded(targetProject, options) {
   const templatePath = path.join(
     targetProject,
     "node_modules",
-    "figma-cache-toolchain",
+    "figma-to-code-pipeline",
     "cursor-bootstrap",
     "examples",
     "ui-adapter.contract.template.json"
@@ -467,7 +467,7 @@ function run() {
     const acceptScript = path.join(
       targetProject,
       "node_modules",
-      "figma-cache-toolchain",
+      "figma-to-code-pipeline",
       "scripts",
       "ui-auto-acceptance.js"
     );
@@ -526,7 +526,7 @@ function run() {
         autoEnsureOnMiss: options.autoEnsureOnMiss,
         fixLoop: options.fixLoop,
         cases: caseFailures,
-        retryCommand: `npm run figma:ui:e2e:cross -- --target-project=${normalizeSlash(
+        retryCommand: `npm run fc:ui:e2e:cross -- --target-project=${normalizeSlash(
           targetProject
         )}${options.batchFile ? ` --batch-file=${normalizeSlash(options.batchFile)}` : ""}${
           options.autoEnsureOnMiss ? " --auto-ensure-on-miss" : ""
@@ -579,7 +579,7 @@ function run() {
                 reason: error.message,
               },
             ],
-            retryCommand: `npm run figma:ui:e2e:cross -- --target-project=${normalizeSlash(
+            retryCommand: `npm run fc:ui:e2e:cross -- --target-project=${normalizeSlash(
               targetProject
             )}${options.batchFile ? ` --batch-file=${normalizeSlash(options.batchFile)}` : ""}${
               options.cacheKey ? ` --cacheKey=${options.cacheKey}` : ""

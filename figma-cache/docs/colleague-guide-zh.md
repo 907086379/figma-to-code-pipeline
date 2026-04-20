@@ -1,4 +1,4 @@
-# figma-cache-toolchain：团队使用说明（可转发）
+# figma-to-code-pipeline：团队使用说明（可转发）
 
 本文面向业务仓库里需要使用 Figma 本地缓存的同事，目标是统一最新协作流程：
 - 先读本地缓存，命中即复用；
@@ -12,7 +12,7 @@
 
 1. **缓存优先**：同一节点已有可用缓存时，不重复拉 MCP。
 2. **证据优先**：当来源是 `figma-mcp`，节点目录必须有 `mcp-raw/` 证据文件，不能只写骨架假成功。
-3. **校验闭环**：执行 `upsert/ensure` 后必须通过 `figma:cache:validate`，否则不能宣称“缓存已就绪”。
+3. **校验闭环**：执行 `upsert/ensure` 后必须通过 `fc:validate`，否则不能宣称“缓存已就绪”。
 
 ---
 
@@ -40,7 +40,7 @@
 ### 步骤 1：安装
 
 ```bash
-npm i -D figma-cache-toolchain
+npm i -D figma-to-code-pipeline
 ```
 
 ### 步骤 2：初始化 Cursor 模板
@@ -57,12 +57,12 @@ npx figma-cache cursor init
 
 ### 步骤 3：在 Cursor 中执行任务书
 
-在对话中 `@AGENT-SETUP-PROMPT.md` 并要求 Agent 按文档执行。通常只需成功一次，用于补齐栈适配规则与 `figma:cache:*` scripts。
+在对话中 `@AGENT-SETUP-PROMPT.md` 并要求 Agent 按文档执行。通常只需成功一次，用于补齐栈适配规则与 `fc:*` scripts。
 
 ### 步骤 4：初始化缓存索引
 
 ```bash
-npm run figma:cache:init
+npm run fc:init
 ```
 
 若尚未配置 scripts：
@@ -89,7 +89,7 @@ npx figma-cache init
 2. 命中且字段足够：直接复用，不调 MCP。
 3. 未命中/字段不足/用户要求刷新：按最小调用集调 MCP，原始回包写入 `mcp-raw/`。
 4. 执行 `upsert/ensure` 写索引与缓存文件。
-5. 同轮执行 `figma:cache:validate`，直到通过。
+5. 同轮执行 `fc:validate`，直到通过。
 
 ### 3.3 本轮交付最小回报项（建议）
 
@@ -140,7 +140,7 @@ npx figma-cache init
 2) 仅在未命中、字段不足或我明确要求刷新时，调用 figma-mcp；
 3) MCP 原始数据写入节点目录 mcp-raw/ 后，再执行 upsert/ensure；
 4) completeness 默认 layout,text,tokens,interactions,states,accessibility；仅命中 flow 白名单时自动补 flow；
-5) 完成后执行 figma:cache:validate，并汇报缓存状态、来源、MCP 调用次数、输出文件清单；若自动补 flow，说明触发原因。
+5) 完成后执行 fc:validate，并汇报缓存状态、来源、MCP 调用次数、输出文件清单；若自动补 flow，说明触发原因。
 
 [Figma 链接]
 ```
@@ -156,14 +156,14 @@ npx figma-cache init
 ## 6. 常用命令（排障/复核用）
 
 ```bash
-npm run figma:cache:config
-npm run figma:cache:get -- "<figma-url>"
-npm run figma:cache:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility
-npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
-npm run figma:cache:validate
-npm run figma:cache:budget
-npm run figma:cache:flow:show -- --flow=<flowId>
-npm run figma:cache:flow:mermaid -- --flow=<flowId>
+npm run fc:config
+npm run fc:get -- "<figma-url>"
+npm run fc:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility
+npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
+npm run fc:validate
+npm run fc:budget
+npm run fc:flow:show -- --flow=<flowId>
+npm run fc:flow:mermaid -- --flow=<flowId>
 ```
 
 ---
@@ -179,21 +179,21 @@ npm run figma:cache:flow:mermaid -- --flow=<flowId>
 ## 8. 升级包后的动作
 
 ```bash
-npm i -D figma-cache-toolchain@latest
+npm i -D figma-to-code-pipeline@latest
 npx figma-cache cursor init
 ```
 
 说明：
 - `cursor init` 每次会刷新任务书与本同事指南。
 - 仅升级包通常不需要重复完整接入流程。
-- 已有 `figma-cache/index.json` 时，一般不需要重复 `figma:cache:init`。
+- 已有 `figma-cache/index.json` 时，一般不需要重复 `fc:init`。
 
 ---
 
 ## 9. 文档入口
 
 - 业务仓库推荐入口：`figma-cache/docs/colleague-guide-zh.md`
-- 包内完整文档：`node_modules/figma-cache-toolchain/figma-cache/docs/README.md`
+- 包内完整文档：`node_modules/figma-to-code-pipeline/figma-cache/docs/README.md`
 - 规范文档：`link-normalization-spec.md`、`flow-edge-taxonomy.md`
 
 将本文件转发到团队 IM / Wiki 即可作为统一口径使用。

@@ -11,7 +11,7 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 - 用户消息包含 Figma URL、`fileKey+nodeId`、或“figma 缓存/本地缓存/刷新”语义时触发。
 
 ## 执行清单（按序）
-1. 标准化链接，先查 `figma-cache/index.json`（`figma:cache:get`）。
+1. 标准化链接，先查 `figma-cache/index.json`（`fc:get`）。
 2. 命中且字段足够：复用本地缓存，结束。
 3. 未命中/不足：仅调最小 MCP 集（默认）：
    - `get_design_context`（`excludeScreenshot=true`）
@@ -34,4 +34,4 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
 
 ## 模板维护约定（强制）
 - `cursor-bootstrap` 是 Skill 唯一手写来源。
-- 仓库内 `.cursor/skills/*` 为镜像产物，使用 `npm run cursor:shadow:sync` 同步生成。
+- 仓库内 `.cursor/skills/*` 为镜像产物，使用 `npm run verify:cursor:sync` 同步生成。

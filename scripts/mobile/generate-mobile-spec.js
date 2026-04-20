@@ -178,14 +178,14 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.url) {
     throw new Error(
-      "缺少 --url 参数。示例: npm run figma:cache:mobile:spec -- --url <figma-url>",
+      "缺少 --url 参数。示例: npm run fc:mobile:spec -- --url <figma-url>",
     );
   }
 
   validatePlatform(args.platform);
 
   if (!fs.existsSync(INDEX_PATH)) {
-    throw new Error("未找到 figma-cache/index.json，请先执行 figma:cache:init");
+    throw new Error("未找到 figma-cache/index.json，请先执行 fc:init");
   }
 
   const index = readJson(INDEX_PATH);
@@ -196,7 +196,7 @@ function main() {
 
   if (!match) {
     throw new Error(
-      "index.json 未命中该 URL，请先执行 figma:cache:get 或 figma:cache:upsert",
+      "index.json 未命中该 URL，请先执行 fc:get 或 fc:upsert",
     );
   }
 

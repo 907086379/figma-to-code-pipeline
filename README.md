@@ -1,9 +1,9 @@
-# figma-cache-toolchain
+# figma-to-code-pipeline
 
 面向业务项目的 Figma 本地缓存工具链：默认采用“本地缓存优先 + 按需 MCP + 最小调用集 + 严格证据校验 + validate 闭环”，提供链接标准化、索引与流程关系维护、缓存读写、校验与预算分析能力。该工具链聚焦“Figma -> 本地通用缓存”数据层，不直接绑定具体 UI 框架。
 
-- npm 包：`figma-cache-toolchain`
-- Git 仓库：<https://github.com/907086379/figma-cache-toolchain.git>
+- npm 包：`figma-to-code-pipeline`
+- Git 仓库：<https://github.com/907086379/figma-to-code-pipeline.git>
 
 ---
 
@@ -21,7 +21,7 @@
 ### 1) 安装
 
 ```bash
-npm i -D figma-cache-toolchain
+npm i -D figma-to-code-pipeline
 ```
 
 ### 2) 初始化 Cursor 模板与任务书
@@ -42,7 +42,7 @@ npx figma-cache cursor init
 ### 3) 初始化本地缓存索引
 
 ```bash
-npm run figma:cache:init
+npm run fc:init
 ```
 
 若项目还没配置 scripts，可临时使用：
@@ -54,7 +54,7 @@ npx figma-cache init
 ### 4) 执行校验
 
 ```bash
-npm run figma:cache:validate
+npm run fc:validate
 ```
 
 ---
@@ -76,10 +76,10 @@ npm run figma:cache:validate
 - 镜像目录：`.cursor/` 视为生成产物，不手工编辑。
 - 日常步骤：
   1) 修改 `cursor-bootstrap/*`
-  2) 运行 `npm run cursor:shadow:sync`
-  3) 运行 `npm run cursor:shadow:check`
+  2) 运行 `npm run verify:cursor:sync`
+  3) 运行 `npm run verify:cursor`
 - 守护机制：
-  - CI 会执行 `cursor:shadow:check`，若 `.cursor` 与 `cursor-bootstrap` 不一致将直接失败。
+  - CI 会执行 `verify:cursor`，若 `.cursor` 与 `cursor-bootstrap` 不一致将直接失败。
   - `npm test` 与 `prepack` 也已包含该检查，避免本地漏同步。
 
 ---
@@ -101,13 +101,13 @@ npm run figma:cache:validate
 
 ```bash
 # 常规场景
-npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
+npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
 
 # 关联节点/同轮或断续多链接串联场景（自动或显式）
-npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility,flow
+npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility,flow
 
 # 同时需要资产留档
-npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility,flow,assets
+npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility,flow,assets
 ```
 
 ---
@@ -115,36 +115,36 @@ npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=la
 ## 常用命令
 
 ```bash
-npm run figma:cache:init
-npm run figma:cache:config
-npm run figma:cache:get -- "<figma-url>"
-npm run figma:cache:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility
-npm run figma:cache:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
-npm run figma:cache:validate
-npm run figma:ui:preflight
-npm run figma:ui:audit -- --min-score=85
-npm run figma:ui:report:aggregate
-npm run figma:ui:accept -- --target=src/components/YourComponent.tsx
-npm run figma:ui:gate
-npm run figma:ui:gate:pr
-npm run figma:ui:gate:main
-npm run figma:cache:budget
-npm run figma:cache:stale
-npm run figma:cache:backfill
+npm run fc:init
+npm run fc:config
+npm run fc:get -- "<figma-url>"
+npm run fc:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility
+npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility
+npm run fc:validate
+npm run fc:ui:preflight
+npm run fc:ui:audit -- --min-score=85
+npm run fc:ui:report:aggregate
+npm run fc:ui:accept -- --target=src/components/YourComponent.tsx
+npm run fc:ui:gate
+npm run fc:ui:gate:pr
+npm run fc:ui:gate:main
+npm run fc:budget
+npm run fc:stale
+npm run fc:backfill
 ```
 
 UI preflight/gate 说明：
 
-- `figma:ui:preflight` 会读取缓存索引与 adapter contract，输出 `figma-cache/reports/ui-preflight-report.json`
+- `fc:ui:preflight` 会读取缓存索引与 adapter contract，输出 `figma-cache/reports/ui-preflight-report.json`
 - 若存在阻断项（如关键文件缺失、coverage evidence 缺失、contract 映射为空），命令返回退出码 `2`
-- `figma:ui:audit` 会输出 `figma-cache/reports/ui-1to1-report.json`，提供 `score.total/layout/text/token/state/interaction`、`diffs`、`blocking`、`warnings`
-- `figma:ui:audit` 基于 `figma-cache/js/ui-facts-normalizer.js` 统一标准化 `spec/raw/state-map/mcp-raw` 事实，默认更偏通用规则而非单组件特化
-- `figma:ui:audit` 会加载 `figma-cache/adapters/recipes/`（前10类高频组件库），仅做可选命中与建议，不做全局强制绑定
-- `figma:ui:gate` 会先跑 preflight + audit（默认阈值 `85`），再串联 `validate`、`cursor:shadow:check` 与 `npm test`
-- `figma:ui:report:aggregate` 会聚合 preflight + audit 报告，输出 `figma-cache/reports/ui-quality-summary.json`
-- `figma:ui:accept` 是一键自动验收：自动跑 preflight + audit + aggregate，并按效果阈值直接返回 pass/fail（退出码）
-- CI 建议矩阵：`figma:ui:gate:pr`（PR 最低门槛）与 `figma:ui:gate:main`（主干严格门槛）
-- `figma:ui:e2e:cross` 现默认启用“真实组件链路保护”：`--target` 不存在或验收出现 `code-level comparison skipped` 会直接失败，避免“未绑定真实组件但通过”的假阳性；如需兼容历史流程可显式传 `--allow-skipped-code-level-comparison`
+- `fc:ui:audit` 会输出 `figma-cache/reports/ui-1to1-report.json`，提供 `score.total/layout/text/token/state/interaction`、`diffs`、`blocking`、`warnings`
+- `fc:ui:audit` 基于 `figma-cache/js/ui-facts-normalizer.js` 统一标准化 `spec/raw/state-map/mcp-raw` 事实，默认更偏通用规则而非单组件特化
+- `fc:ui:audit` 会加载 `figma-cache/adapters/recipes/`（前10类高频组件库），仅做可选命中与建议，不做全局强制绑定
+- `fc:ui:gate`：`verify:static` → `fc:ui:preflight` → `fc:ui:audit`（默认阈值 `85`）→ `fc:validate` → `test:node`（规则守卫 + 单测 + smoke；不重复跑静态校验）
+- `fc:ui:report:aggregate` 会聚合 preflight + audit 报告，输出 `figma-cache/reports/ui-quality-summary.json`
+- `fc:ui:accept` 是一键自动验收：自动跑 preflight + audit + aggregate，并按效果阈值直接返回 pass/fail（退出码）
+- CI 建议矩阵：`fc:ui:gate:pr`（PR 最低门槛）与 `fc:ui:gate:main`（主干严格门槛）
+- `fc:ui:e2e:cross` 现默认启用“真实组件链路保护”：`--target` 不存在或验收出现 `code-level comparison skipped` 会直接失败，避免“未绑定真实组件但通过”的假阳性；如需兼容历史流程可显式传 `--allow-skipped-code-level-comparison`
 
 UI profile 分层（P3）：
 
@@ -166,15 +166,15 @@ UI profile 分层（P3）：
 ### 1) 克隆并安装依赖
 
 ```bash
-git clone https://github.com/907086379/figma-cache-toolchain.git
-cd figma-cache-toolchain
+git clone https://github.com/907086379/figma-to-code-pipeline.git
+cd figma-to-code-pipeline
 npm ci
 ```
 
 ### 2) 本地自检
 
 ```bash
-npm run docs:encoding:check
+npm run verify:docs
 npm test
 ```
 

@@ -80,7 +80,7 @@ function main() {
   }
 
   if (utf8DecodeErrors.length || mojibakeFiles.length) {
-    console.error("[docs:encoding:check] FAILED");
+    console.error("[verify:docs] FAILED");
 
     if (utf8DecodeErrors.length) {
       console.error("\nUTF-8 decode errors:");
@@ -99,7 +99,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`[docs:encoding:check] OK (${files.length} files)`);
+  console.log(`[verify:docs] OK (${files.length} files)`);
 }
 
 main();

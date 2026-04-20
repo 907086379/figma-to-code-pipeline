@@ -32,7 +32,7 @@ Release date: 2026-04-15
 
 ## Validation
 
-- `npm run docs:encoding:check` passed
+- `npm run verify:docs` passed
 - `npm test` passed
 
 ## Upgrade Notes

@@ -1,6 +1,6 @@
 # Figma Cache：请 Agent 一次性完成项目适配
 
-> **给 Cursor Agent 的指令**：你正在操作的是**用户业务项目**的根目录。以下文件应已存在（由 `npx figma-cache cursor init` 从 npm 包 **`figma-cache-toolchain`** 复制到当前仓库根）：
+> **给 Cursor Agent 的指令**：你正在操作的是**用户业务项目**的根目录。以下文件应已存在（由 `npx figma-cache cursor init` 从 npm 包 **`figma-to-code-pipeline`** 复制到当前仓库根）：
 > - `.cursor/rules/01-figma-cache-core.mdc`
 > - `.cursor/rules/00-output-token-budget.mdc`（通用低 token 输出基线）
 > - `.cursor/rules/02-figma-stack-adapter.mdc`（**占位**，任务完成后需删除）
@@ -29,12 +29,12 @@
    确认第 4 步文件已写入且无语法问题后，**删除** `.cursor/rules/02-figma-stack-adapter.mdc`。若用户在 Cursor 设置里固定引用了该文件名，请在汇报中提示用户改为引用新的 `02-figma-<栈>-adapter.mdc`。
 
 6. **补全 npm scripts（若缺失）**  
-   若 `package.json` 中没有任何 `figma:cache:*` 脚本，请追加一组，命令使用 **`npx figma-cache`** 或 **`figma-cache`**（与项目是否已安装本包、以及 `node_modules/.bin` 是否可用一致即可，优先 `npx figma-cache` 以减少环境差异）。至少包含：`init`、`config`、`validate`、`ensure`、`get`（名称与 `figma-cache --help` 或包内 **`figma-cache/docs/README.md`** 中 scripts 示例一致即可）。
+   若 `package.json` 中没有任何 `fc:*` 脚本，请追加一组，命令使用 **`npx figma-cache`** 或 **`figma-cache`**（与项目是否已安装本包、以及 `node_modules/.bin` 是否可用一致即可，优先 `npx figma-cache` 以减少环境差异）。至少包含：`init`、`config`、`validate`、`ensure`、`get`（名称与 `figma-cache --help` 或包内 **`figma-cache/docs/README.md`** 中 scripts 示例一致即可）。
 
 7. **收尾**  
    - 用简短列表向用户汇报：新建/修改/删除了哪些路径。  
-   - 若项目根**尚无** `figma-cache/index.json`，提示用户执行：`npm run figma:cache:init`（若已加 script）或 `npx figma-cache init`（与 `cursor init` 不同，用于创建空索引与缓存目录）。  
-   - 提示用户在本项目根执行：`npm run figma:cache:validate`（若已加 script）或 `npx figma-cache validate`。  
+   - 若项目根**尚无** `figma-cache/index.json`，提示用户执行：`npm run fc:init`（若已加 script）或 `npx figma-cache init`（与 `cursor init` 不同，用于创建空索引与缓存目录）。  
+   - 提示用户在本项目根执行：`npm run fc:validate`（若已加 script）或 `npx figma-cache validate`。  
    - 说明：后续 Figma 相关对话将主要由 **01 Core + 新 Adapter + Skill** 驱动。  
       - **可选**：若项目已通过 `cursor init` 同步 `figma-cache/docs/colleague-guide-zh.md`，提示团队默认只使用 **§5.1「最推荐主提示词」**，只有特殊诉求再追加 **§5.2** 的一句附加要求。
 
@@ -45,7 +45,7 @@
 
 ## 硬约束（违反则视为未完成）
 
-- **不要**修改 `node_modules/figma-cache-toolchain/` 下已发布包内文件（应无此必要）。  
+- **不要**修改 `node_modules/figma-to-code-pipeline/` 下已发布包内文件（应无此必要）。  
 - **不要**修改 `figma-cache/figma-cache.js` 或破坏 Core「框架中立」语义。  
 - **不要**把业务路由名、具体组件库 API 写进 `figma-cache/files/**` 下的 `meta.json` / `raw.json` / `spec.md`。
 - **不要**把 `flow` 设为默认 completeness；必须保持默认 `layout,text,tokens,interactions,states,accessibility`，并仅在 flow 白名单命中时追加（关系关键词或多链接串联意图）。
@@ -54,7 +54,7 @@
 ## 可选参考（仅在用户需要 Vue2+Vuetify2 时）
 
 包内附带参考文本（**不在 init 时复制到 .cursor**）：  
-`node_modules/figma-cache-toolchain/cursor-bootstrap/examples/vue2-vuetify2-adapter.reference.mdc`  
+`node_modules/figma-to-code-pipeline/cursor-bootstrap/examples/vue2-vuetify2-adapter.reference.mdc`  
 若用户明确要求该栈，可读入后改写为第 4 步的 Adapter 规则内容。
 
 ---

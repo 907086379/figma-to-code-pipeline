@@ -136,7 +136,7 @@ function handleFlowCommand(args, deps) {
     const normalized = { cacheKey: resolved.cacheKey };
     if (!ensureArg && !getItem(index, normalized.cacheKey)) {
       console.error(
-        `Missing cache item for ${normalized.cacheKey}. Run figma:cache:ensure first, or pass --ensure.`
+        `Missing cache item for ${normalized.cacheKey}. Run fc:ensure first, or pass --ensure.`
       );
       process.exit(2);
     }
@@ -146,7 +146,7 @@ function handleFlowCommand(args, deps) {
           `flow add-node --ensure requires a Figma URL. Got shorthand "${String(input || "").trim()}".`
         );
         console.error(
-          `Tip: set FIGMA_DEFAULT_FILEKEY and run figma:cache:ensure for this node first, then re-run flow add-node without --ensure.`
+          `Tip: set FIGMA_DEFAULT_FILEKEY and run fc:ensure for this node first, then re-run flow add-node without --ensure.`
         );
         process.exit(2);
       }

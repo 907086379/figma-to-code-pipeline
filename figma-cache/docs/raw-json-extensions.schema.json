@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://figma-cache-toolchain/raw-json-extensions",
+  "$id": "https://figma-to-code-pipeline/raw-json-extensions",
   "title": "figma-cache raw.json optional extensions",
   "description": "Loose schema for machine-derived fields merged during MCP hydrate. Core raw.json fields are not fully specified here.",
   "type": "object",

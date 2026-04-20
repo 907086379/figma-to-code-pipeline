@@ -25,7 +25,7 @@
 ## 5) 主提示词（建议直接复制）
 
 ```text
-请按项目 figma 缓存规则处理下面链接：先查本地缓存，未命中或字段不足再按需调用 figma-mcp；原始回包写入 mcp-raw/ 后执行 upsert/ensure；最后执行 figma:cache:validate。请回报缓存状态、来源、MCP 调用次数、输出文件清单；若自动补 flow，请说明触发原因。
+请按项目 figma 缓存规则处理下面链接：先查本地缓存，未命中或字段不足再按需调用 figma-mcp；原始回包写入 mcp-raw/ 后执行 upsert/ensure；最后执行 fc:validate。请回报缓存状态、来源、MCP 调用次数、输出文件清单；若自动补 flow，请说明触发原因。
 
 [Figma 链接]
 ```
@@ -33,10 +33,10 @@
 ## 6) 排障常用命令
 
 ```bash
-npm run figma:cache:config
-npm run figma:cache:get -- "<figma-url>"
-npm run figma:cache:validate
-npm run figma:cache:budget
+npm run fc:config
+npm run fc:get -- "<figma-url>"
+npm run fc:validate
+npm run fc:budget
 ```
 
 更多细节：`figma-cache/docs/colleague-guide-zh.md`

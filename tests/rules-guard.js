@@ -29,7 +29,7 @@ mustContainAll("cursor-bootstrap/rules/00-output-token-budget.mdc", [
   "失败原因 / 定位信息 / 修复动作",
   "cursor-bootstrap",
   ".cursor",
-  "cursor:shadow:sync",
+  "verify:cursor:sync",
 ]);
 
 // Rule 01: core cache workflow and hard gates must remain.
@@ -52,7 +52,7 @@ mustContainAll("cursor-bootstrap/rules/01-figma-cache-core.mdc", [
 // Skill: keep as concise execution checklist, while preserving key behavior.
 mustContainAll("cursor-bootstrap/skills/figma-mcp-local-cache/SKILL.md", [
   "执行清单",
-  "figma:cache:get",
+  "fc:get",
   "get_design_context",
   "get_metadata",
   "get_variable_defs",

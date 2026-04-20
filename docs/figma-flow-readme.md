@@ -4,7 +4,7 @@
 
 ## 流程总览（手填 / 或粘贴 mermaid）
 
-用自然语言写用户路径，或粘贴 `npm run figma:cache:flow mermaid -- --flow=<flowId>` 的输出：
+用自然语言写用户路径，或粘贴 `npm run fc:flow:mermaid -- --flow=<flowId>` 的输出：
 
 ```mermaid
 %% flow mermaid 输出贴此处
@@ -27,7 +27,7 @@
 - **source**: manual
 - **completeness**: —
 - **spec**: `figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/spec.md` · **meta**: `figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/meta.json`
-- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run figma:cache:flow mermaid` 输出贴到下方「流程总览」。
+- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run fc:flow:mermaid` 输出贴到下方「流程总览」。
 <!-- cache-node:53hw0wDvgOzH14DXSsnEmE#9278:30673 -->
 ### `53hw0wDvgOzH14DXSsnEmE#9278:30673`
 
@@ -36,7 +36,7 @@
 - **source**: figma-mcp
 - **completeness**: layout, text, tokens
 - **spec**: `figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9278-30673/spec.md` · **meta**: `figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9278-30673/meta.json`
-- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run figma:cache:flow mermaid` 输出贴到下方「流程总览」。
+- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run fc:flow:mermaid` 输出贴到下方「流程总览」。
 <!-- cache-node:abcABCd0123456789vWxyZ#1:2 -->
 ### `abcABCd0123456789vWxyZ#1:2`
 
@@ -45,5 +45,5 @@
 - **source**: figma-mcp
 - **completeness**: layout, text, tokens, interactions, states, accessibility
 - **spec**: `C:/Users/90708/AppData/Local/Temp/figma-cache-smoke-validate-1zV1nO/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/spec.md` · **meta**: `C:/Users/90708/AppData/Local/Temp/figma-cache-smoke-validate-1zV1nO/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/meta.json`
-- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run figma:cache:flow mermaid` 输出贴到下方「流程总览」。
+- **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run fc:flow:mermaid` 输出贴到下方「流程总览」。
 

@@ -95,9 +95,9 @@ function readSelfNpmPackageName() {
     const pkgPath = path.join(__dirname, "..", "package.json");
     const raw = fs.readFileSync(pkgPath, "utf8");
     const j = JSON.parse(raw);
-    return j && j.name ? String(j.name) : "figma-cache-toolchain";
+    return j && j.name ? String(j.name) : "figma-to-code-pipeline";
   } catch {
-    return "figma-cache-toolchain";
+    return "figma-to-code-pipeline";
   }
 }
 const INDEX_PATH = path.isAbsolute(INDEX_FILE_NAME)

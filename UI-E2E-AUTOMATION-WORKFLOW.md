@@ -1,6 +1,6 @@
 # UI E2E 自动化流程说明（toolchain -> 目标项目）
 
-这份文档用于快速落地 **`figma-cache-toolchain` 到目标项目**（如与 toolchain 仓库并列的 `vue-demo`；下文命令里用 **`../vue-demo`** 表示从本仓库根目录进入该目录）的联调验收流程。  
+这份文档用于快速落地 **`figma-to-code-pipeline` 到目标项目**（如与 toolchain 仓库并列的 `vue-demo`；下文命令里用 **`../vue-demo`** 表示从本仓库根目录进入该目录）的联调验收流程。  
 目标：尽量自动化，失败时自动产出 Agent 接力任务，形成稳定闭环。
 
 若业务仓不在上一级、或目录名不是 `vue-demo`，请把命令里的 `../vue-demo` 换成你的实际相对路径（或绝对路径）。
@@ -55,14 +55,14 @@ npm run figma:workflow:fresh:wait-verify
 
 ## 2. 核心能力一览
 
-- `figma:ui:e2e:cross`：跨项目联调总控（本仓库执行）
+- `fc:ui:e2e:cross`：跨项目联调总控（本仓库执行）
   - 自动 `npm pack` 当前包并安装到目标项目
   - 自动执行目标项目验收链路
   - 支持 cache miss 自动补齐
   - 支持失败自动重试
   - 支持失败自动产出 `agent-task.md`
 
-- `figma:ui:accept`：效果导向自动验收（目标项目执行）
+- `fc:ui:accept`：效果导向自动验收（目标项目执行）
   - 自动跑 preflight -> audit -> aggregate
   - 以退出码判定 pass/fail
   - 运行报告输出到 `figma-cache/reports/runtime/*.json`
@@ -75,13 +75,13 @@ npm run figma:workflow:fresh:wait-verify
 
 ```bash
 cd ../vue-demo
-npm i -D figma-cache-toolchain@latest
+npm i -D figma-to-code-pipeline@latest
 npx figma-cache cursor init
 ```
 
 补充（多根工作区本地联调推荐）：
 
-- 若你的 `vue-demo/package.json` 已配置 `figma-cache-toolchain` 为本地源码依赖（例如 `file:../figma-cache-v1`），则不需要安装 `@latest`。
+- 若你的 `vue-demo/package.json` 已配置 `figma-to-code-pipeline` 为本地源码依赖（例如 `file:../figma-cache-v1`，或与目录名一致的 `file:../figma-to-code-pipeline`），则不需要安装 `@latest`。
 - 本地源码联调时建议用 `npm install` 刷新依赖即可；仅在需要“验证发布包”时再用 `npm pack`/tgz 或 `@latest`。
 
 ### 3.2 准备批量文件（推荐）
@@ -110,7 +110,7 @@ npx figma-cache cursor init
 在 **toolchain 仓库** 执行：
 
 ```bash
-npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 ### 参数说明
@@ -134,7 +134,7 @@ npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-d
 - `0` = 通过
 - `2` = 失败（需处理）
 
-补充：`figma:ui:e2e:cross` 已启用真实组件链路保护：
+补充：`fc:ui:e2e:cross` 已启用真实组件链路保护：
 
 - `target` 文件不存在会直接失败
 - 若验收出现 `code-level comparison skipped` 会直接失败（除非显式传 `--allow-skipped-code-level-comparison`）
@@ -201,19 +201,19 @@ npm run figma:workflow:fresh:verify
 ### 模式 A：单节点快速验证
 
 ```bash
-npm run figma:ui:e2e:cross -- --target-project=../vue-demo --fileKey=53hw0wDvgOzH14DXSsnEmE --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=53hw0wDvgOzH14DXSsnEmE --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 ### 模式 B：批量回归（推荐日常）
 
 ```bash
-npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 ### 模式 C：严格抽检（发布前）
 
 ```bash
-npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --profile=strict --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --profile=strict --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 ---
@@ -241,7 +241,7 @@ npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-d
 ## 11. 你真正需要记住的一条命令
 
 ```bash
-npm run figma:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo/figma-e2e-batch.json --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 这条命令就是默认主入口。

@@ -2,8 +2,9 @@
 "use strict";
 
 /**
- * Generate iconInsets.<cacheKey>.generated.ts for each batch item.
- * Output directory defaults to the target component directory (dirname(target)).
+ * Generate one `iconInsets.generated.ts` per unique batch `target` path.
+ * Multiple batch rows pointing at the same Vue file are merged into
+ * ICON_INSETS_PX_BY_ROOT (per Figma root cacheKey); ICON_INSETS_PX aliases the first row.
  *
  * Usage:
  *   node scripts/generate-icon-insets-from-batch.cjs --batch=./figma-e2e-batch.json
@@ -11,7 +12,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const {
+  mergeIconMetricsFromRawPaths,
+  buildTsBundled,
+  legacySanitizedCacheKeyFileName,
+} = require("./generate-icon-insets.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_INDEX_ABS = path.join(ROOT, "figma-cache", "index.json");
@@ -115,13 +120,21 @@ function parseArgs(argv) {
   const out = {
     batch: path.join(ROOT, "figma-e2e-batch.json"),
     maxBox: 24,
-    toolchainGenerateScript: path.join(__dirname, "generate-icon-insets.cjs"),
   };
   argv.slice(2).forEach((arg) => {
     if (arg.startsWith("--batch=")) out.batch = arg.split("=").slice(1).join("=").trim();
     if (arg.startsWith("--max-box=")) out.maxBox = Number(arg.split("=").slice(1).join("=").trim());
   });
   return out;
+}
+
+function rawAbsPathsForCase(cacheKey, relatedCacheKeys) {
+  const keys = [cacheKey, ...relatedCacheKeys];
+  return keys.map((ck) => {
+    const [fk, nid] = String(ck).split("#");
+    const safeNodeDir = String(nid || "").replace(/:/g, "-");
+    return path.join(ROOT, "figma-cache", "files", fk, "nodes", safeNodeDir, "raw.json");
+  });
 }
 
 function main() {
@@ -137,13 +150,7 @@ function main() {
     process.exit(2);
   }
 
-  const genAbs = args.toolchainGenerateScript;
-  if (!fs.existsSync(genAbs)) {
-    console.error(`[generate-icon-insets-from-batch] missing generator: ${genAbs}`);
-    process.exit(2);
-  }
-
-  const outputs = [];
+  const prepared = [];
   payload.forEach((item, idx) => {
     const cacheKey = String(item && (item.cacheKey || cacheKeyFromItem(item)) || "").trim();
     const targetAbs = resolveTargetAbs(item && item.target);
@@ -164,30 +171,50 @@ function main() {
       console.error(`[generate-icon-insets-from-batch] case[${idx}] missing target`);
       process.exit(2);
     }
-    const targetDir = path.dirname(targetAbs);
-    const rawArgs = [cacheKey, ...relatedCacheKeys]
-      .map((ck) => {
-        const [fk, nid] = String(ck).split("#");
-        const safeNodeDir = String(nid || "").replace(/:/g, "-");
-        const rawAbs = path.join(ROOT, "figma-cache", "files", fk, "nodes", safeNodeDir, "raw.json");
-        if (!fs.existsSync(rawAbs)) {
-          console.error(`[generate-icon-insets-from-batch] raw.json not found for ${ck}: ${rawAbs}`);
-          process.exit(2);
-        }
-        return `--raw="${rawAbs}"`;
-      })
-      .join(" ");
-
-    execSync(`node "${genAbs}" ${rawArgs} --out-dir="${targetDir}" --cacheKey="${cacheKey}" --max-box=${args.maxBox}`, {
-      cwd: ROOT,
-      stdio: "pipe",
+    const rawAbsList = rawAbsPathsForCase(cacheKey, relatedCacheKeys);
+    const rawKeyOrder = [cacheKey, ...relatedCacheKeys];
+    rawAbsList.forEach((rawAbs, j) => {
+      const ck = rawKeyOrder[j] || cacheKey;
+      if (!fs.existsSync(rawAbs)) {
+        console.error(`[generate-icon-insets-from-batch] raw.json not found for ${ck}: ${rawAbs}`);
+        process.exit(2);
+      }
     });
-    outputs.push({ cacheKey, outDir: targetDir });
+    prepared.push({ idx, cacheKey, targetAbs, targetDir: path.dirname(targetAbs), rawAbsList });
   });
 
-  console.log(
-    `[generate-icon-insets-from-batch] ok (${outputs.length} cases)`
-  );
+  const byTarget = new Map();
+  prepared.forEach((row) => {
+    const key = path.normalize(row.targetAbs);
+    if (!byTarget.has(key)) byTarget.set(key, []);
+    byTarget.get(key).push(row);
+  });
+
+  const outputs = [];
+  byTarget.forEach((rows) => {
+    rows.sort((a, b) => a.idx - b.idx);
+    const primaryCacheKey = rows[0].cacheKey;
+    const byRoot = {};
+    rows.forEach((r) => {
+      byRoot[r.cacheKey] = mergeIconMetricsFromRawPaths(r.rawAbsList, ROOT, args.maxBox);
+    });
+    const outAbs = path.join(rows[0].targetDir, "iconInsets.generated.ts");
+    fs.mkdirSync(path.dirname(outAbs), { recursive: true });
+    fs.writeFileSync(outAbs, buildTsBundled(byRoot, primaryCacheKey), "utf8");
+    rows.forEach((r) => {
+      const legacy = path.join(r.targetDir, legacySanitizedCacheKeyFileName(r.cacheKey));
+      if (fs.existsSync(legacy) && path.normalize(legacy) !== path.normalize(outAbs)) {
+        try {
+          fs.unlinkSync(legacy);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+    outputs.push({ target: rows[0].targetAbs, roots: rows.map((r) => r.cacheKey) });
+  });
+
+  console.log(`[generate-icon-insets-from-batch] ok (${outputs.length} target(s))`);
 }
 
 main();

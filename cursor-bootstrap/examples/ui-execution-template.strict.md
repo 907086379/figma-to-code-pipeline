@@ -2,10 +2,10 @@
 
 适用：主干发布、关键路径页面、高保真验收。
 
-1. `npm run figma:ui:preflight`
-2. `npm run figma:ui:audit -- --target=<component-path> --min-score=92`
-3. `npm run figma:ui:report:aggregate`
-4. `npm run figma:ui:gate:main`
+1. `npm run fc:ui:preflight`
+2. `npm run fc:ui:audit -- --target=<component-path> --min-score=92`
+3. `npm run fc:ui:report:aggregate`
+4. `npm run fc:ui:gate:main`
 
 建议：
 - `FIGMA_UI_PROFILE=strict`

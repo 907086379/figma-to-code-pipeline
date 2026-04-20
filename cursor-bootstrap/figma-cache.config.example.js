@@ -210,7 +210,7 @@ function appendFlowReadmeRegistry(ctx) {
     `- **source**: ${ctx.source || "-"}\n` +
     `- **completeness**: ${completeness}\n` +
     `- **spec**: \`${specRel}\` · **meta**: \`${metaRel}\`\n` +
-    `- **提示**: 像素级还原以 \`spec.md\` / \`raw.json\` 为准；用户路径请维护 \`flows\` 后把 \`npm run figma:cache:flow mermaid\` 输出贴到下方「流程总览」。\n`;
+    `- **提示**: 像素级还原以 \`spec.md\` / \`raw.json\` 为准；用户路径请维护 \`flows\` 后把 \`npm run fc:flow:mermaid\` 输出贴到下方「流程总览」。\n`;
 
   if (!fs.existsSync(abs)) {
     fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -218,7 +218,7 @@ function appendFlowReadmeRegistry(ctx) {
       `# 设计与流程说明（示例骨架）\n\n` +
       `> 本文件由 **figma-cache.config.example.js** 的 \`postEnsure\` 自动创建并增量更新；**可整文件改写**或复制逻辑到自有 \`figma-cache.config.js\`。\n\n` +
       `## 流程总览（手填 / 或粘贴 mermaid）\n\n` +
-      `用自然语言写用户路径，或粘贴 \`npm run figma:cache:flow mermaid -- --flow=<flowId>\` 的输出：\n\n` +
+      `用自然语言写用户路径，或粘贴 \`npm run fc:flow:mermaid -- --flow=<flowId>\` 的输出：\n\n` +
       `\`\`\`mermaid\n%% flow mermaid 输出贴此处\n\`\`\`\n\n` +
       `## 交互与边界（手填）\n\n` +
       `- 分支条件：\n` +

@@ -42,10 +42,10 @@ alwaysApply: true
 
 - 2026-04-15 | PowerShell 直接写 Markdown 含反引号路径 | 反引号在双引号字符串中被当作转义，写入了异常控制字符 | 在双引号字符串里直接写 `figma-cache/docs/*.md` 行 | 改为单引号字符串或 here-string 写入，再按关键词二次回读校验 | README 路径行已修复，编码检查通过
 
-- 2026-04-16 | PowerShell 链式命令与脚本文件写入 | 在 Windows PowerShell 5.1 中使用 `&&` 解析失败，且 `Set-Content -Encoding utf8` 产 BOM 导致 Node shebang/JSON 解析报错 | `ls "..." && ls "..."` 与 `Set-Content -Encoding utf8` 直接写 `.js/.json` | 跨环境命令改用 `;`；脚本与 JSON 统一改用 `.NET UTF8Encoding(false)` 无 BOM 写入 | `npm run cursor:shadow:sync` 与 `npm run cursor:shadow:check` 均通过
+- 2026-04-16 | PowerShell 链式命令与脚本文件写入 | 在 Windows PowerShell 5.1 中使用 `&&` 解析失败，且 `Set-Content -Encoding utf8` 产 BOM 导致 Node shebang/JSON 解析报错 | `ls "..." && ls "..."` 与 `Set-Content -Encoding utf8` 直接写 `.js/.json` | 跨环境命令改用 `;`；脚本与 JSON 统一改用 `.NET UTF8Encoding(false)` 无 BOM 写入 | `npm run verify:cursor:sync` 与 `npm run verify:cursor` 均通过
 
 - 2026-04-16 | PowerShell 执行复杂字符串替换命令 | 直接在 shell 命令中内嵌多层反引号/模板字符串导致解析失败 | 在 PowerShell 命令参数中直接拼接复杂 `Replace(...)` 字面量 | 改为临时 `.js` 脚本执行替换并立即回读验证，再删除临时文件 | `figma-cache.js`、文档与测试更新成功，`npm test` 通过
 
-- 2026-04-16 | 临时 Node 脚本做代码替换 | 在替换字符串中误写 `\\n` 字面量导致目标 JS 源码出现非法转义并触发 SyntaxError | 直接字符串替换注入多行 JS 代码片段 | 改为整段模板重写或替换后立即运行目标脚本校验；发现异常立即回滚并精确替换 | 修复后 `npm run cursor:shadow:sync/check` 与 `npm test` 全通过
+- 2026-04-16 | 临时 Node 脚本做代码替换 | 在替换字符串中误写 `\\n` 字面量导致目标 JS 源码出现非法转义并触发 SyntaxError | 直接字符串替换注入多行 JS 代码片段 | 改为整段模板重写或替换后立即运行目标脚本校验；发现异常立即回滚并精确替换 | 修复后 `npm run verify:cursor:sync/check` 与 `npm test` 全通过
 
 - 2026-04-16 | PowerShell 调用 pwsh -Command 变量被宿主提前展开 | 在 Windows PowerShell 中使用双引号包裹 `pwsh -Command`，`$PSVersionTable` 被外层 shell 先展开导致语法错误 | `pwsh -Command "$PSVersionTable.PSVersion.ToString()"` | 统一改为单引号包裹命令文本或使用脚本文件（如 `pwsh -Command '...'`） | `pwsh` 版本与 profile 校验命令稳定通过

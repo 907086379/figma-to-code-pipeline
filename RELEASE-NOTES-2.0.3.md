@@ -11,8 +11,8 @@ Release date: 2026-04-16
 
 ## Validation
 
-- `npm run cursor:shadow:sync` passed
-- `npm run cursor:shadow:check` passed
+- `npm run verify:cursor:sync` passed
+- `npm run verify:cursor` passed
 - `npm test` passed
 
 ## Upgrade Notes

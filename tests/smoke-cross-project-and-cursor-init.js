@@ -13,15 +13,23 @@ function runSmokeCrossProjectAndCursorInit(context) {
     runCrossProjectE2E,
   } = context;
 
-  // package files: should include ui auto acceptance scripts for cross-project usage
+  // package files: should ship UI / cross-project scripts (explicit paths or scripts/*.js glob)
   {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
     const files = Array.isArray(pkg.files) ? pkg.files : [];
-    assert.ok(files.includes("scripts/ui-auto-acceptance.js"), "package files should include ui-auto-acceptance script");
-    assert.ok(files.includes("scripts/ui-preflight.js"), "package files should include ui-preflight script");
-    assert.ok(files.includes("scripts/ui-1to1-audit.js"), "package files should include ui-audit script");
-    assert.ok(files.includes("scripts/ui-report-aggregate.js"), "package files should include ui-report-aggregate script");
-    assert.ok(files.includes("scripts/cross-project-e2e.js"), "package files should include cross-project-e2e script");
+    const scriptGlobs = files.includes("scripts/*.js");
+    const requiredScripts = [
+      "scripts/ui-auto-acceptance.js",
+      "scripts/ui-preflight.js",
+      "scripts/ui-1to1-audit.js",
+      "scripts/ui-report-aggregate.js",
+      "scripts/cross-project-e2e.js",
+    ];
+    for (const rel of requiredScripts) {
+      const listed = files.includes(rel) || scriptGlobs;
+      assert.ok(listed, `package files should include ${rel} (or scripts/*.js)`);
+      assert.ok(fs.existsSync(path.join(root, rel)), `expected script on disk: ${rel}`);
+    }
   }
 
   // cross-project-e2e: should fail fast when target project is missing

@@ -215,7 +215,7 @@ function copyCursorBootstrap(options, deps) {
           ? "colleague-guide-zh.md already at package path (toolchain dev tree); no copy."
           : "colleague-guide-zh.md refreshed under FIGMA_CACHE_DIR/docs (default figma-cache/docs/).",
         agentPromptNote:
-          "AGENT-SETUP-PROMPT.md is refreshed every run. Next: @ it in Cursor; after Agent finishes, run npm run figma:cache:init (or npx figma-cache init if scripts are missing).",
+          "AGENT-SETUP-PROMPT.md is refreshed every run. Next: @ it in Cursor; after Agent finishes, run npm run fc:init (or npx figma-cache init if scripts are missing).",
         npmPackageName: npmPkg,
       },
       null,
@@ -229,7 +229,7 @@ function copyCursorBootstrap(options, deps) {
       "1) 在 Cursor 对话中输入 @AGENT-SETUP-PROMPT.md，并说明「按该文档执行」\n" +
       "   （每次 cursor init 都会刷新该文件；无需再整篇粘贴。）\n" +
       "2) 待 Agent 完成后，在项目根初始化本地缓存索引：\n" +
-      "   npm run figma:cache:init\n" +
+      "   npm run fc:init\n" +
       "   若尚未补全 npm scripts，请改用：npx figma-cache init\n" +
       "================================================================\n"
   );

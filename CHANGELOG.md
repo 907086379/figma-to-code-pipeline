@@ -2,10 +2,17 @@
 
 本文件记录 **对外发布**（npm）时建议同步更新的变更。仓库内日常迭代可只写 Git commit message；发版前将本条目下的 **Unreleased** 归并到新版本号。
 
+## 3.0.0（2026-04-20）
+
+- **Breaking：npm 包名**：`figma-cache-toolchain` → **`figma-to-code-pipeline`**（CLI 命令 **`figma-cache`** 不变）。建议将本地源码目录重命名为 `figma-to-code-pipeline`，并把 `vue-demo` 的 `file:` 依赖改为 `file:../figma-to-code-pipeline`；在重命名完成前可使用 `file:../figma-cache-v1`。
+- **Breaking：npm scripts 命名空间**：`figma:cache:*` → `fc:*`，`figma:ui:*` → `fc:ui:*`；`cursor:shadow:*` → `verify:cursor*`；`docs:encoding:check` → `verify:docs`；`preflight:shell*` → `verify:shell*`。
+- **门禁结构**：`verify:static`（Cursor 镜像 + 文档编码）与 `test:node`（规则守卫 + 单测 + smoke）拆分；`fc:ui:gate*` 不再重复跑两遍静态校验。
+- **发布前**：`prepack` 增加 `verify:pack`（按 `files` 展开校验关键路径，不调用 `npm pack`，避免生命周期递归）。
+
 ## Unreleased
 
-- `figma:ui:e2e:cross` 增加真实组件链路防呆：single/batch 模式下 `--target` 文件不存在时直接失败。
-- `figma:ui:e2e:cross` 默认阻断 `code-level comparison skipped`（可用 `--allow-skipped-code-level-comparison` 显式放行兼容旧流程），避免未绑定真实组件路径时出现假阳性通过。
+- `fc:ui:e2e:cross` 增加真实组件链路防呆：single/batch 模式下 `--target` 文件不存在时直接失败。
+- `fc:ui:e2e:cross` 默认阻断 `code-level comparison skipped`（可用 `--allow-skipped-code-level-comparison` 显式放行兼容旧流程），避免未绑定真实组件路径时出现假阳性通过。
 - `tests/smoke.js` 补充 cross-project-e2e 缺失目标文件的失败用例，覆盖上述行为。
 
 ## 2.0.3（2026-04-16）
@@ -40,16 +47,16 @@
 
 - **文档修复**：重写根 `README.md`，修复历史乱码并统一为可读中文说明。
 - **编码护栏**：在 Core Rule 与本地缓存 Skill 中新增「Encoding And Anti-Mojibake」强制约束，明确 UTF-8 写入与乱码处理流程。
-- **自动检查**：新增 `docs:encoding:check`（`scripts/check-doc-encoding.js`），用于检测 `.md/.mdc` UTF-8 解码异常与常见乱码片段。
-- **发布前门禁**：`test` 与 `prepack` 脚本前置 `docs:encoding:check`，在测试与打包阶段自动拦截乱码文档。
+- **自动检查**：新增 `verify:docs`（`scripts/check-doc-encoding.js`），用于检测 `.md/.mdc` UTF-8 解码异常与常见乱码片段。
+- **发布前门禁**：`test` 与 `prepack` 脚本前置 `verify:docs`，在测试与打包阶段自动拦截乱码文档。
 
 ## 1.4.2（2026-04-15）
 
-- **CLI**：新增 `budget` 子命令与 `figma:cache:budget` script，预算主字段统一为 `tokenProxyBytes`，保留 `tokenProxyChars` 兼容。
+- **CLI**：新增 `budget` 子命令与 `fc:budget` script，预算主字段统一为 `tokenProxyBytes`，保留 `tokenProxyChars` 兼容。
 - **CLI 安全**：`ensure --source=figma-mcp` 默认阻止“假成功”；仅在显式 `--allow-skeleton-with-figma-mcp` 时允许骨架模式。
 - **规则/技能与文档**：统一 v2 流程口径（先 MCP 写 `mcp-raw/`，再 `upsert/ensure`），补充大文件读取策略与预算说明。
 - **模板**：`AGENT-SETUP-PROMPT.md` 与 `cursor-bootstrap/AGENT-SETUP-PROMPT.md` 同步更新 v2 提示词。
-- **文档修正**：根 `README.md` 里的 `npm run figma-cache:validate` 更正为 `npm run figma:cache:validate`。
+- **文档修正**：根 `README.md` 里的 `npm run figma-cache:validate` 更正为 `npm run fc:validate`。
 
 ## 1.4.1（2026-04-14）
 
@@ -68,7 +75,7 @@
 
 ## 1.3.2
 
-- **`cursor init`**：终端下一步改为**单一方式**（`@AGENT-SETUP-PROMPT.md`）；并提示 **Agent 完成后**执行 **`npm run figma:cache:init`**（无 script 时用 **`npx figma-cache init`**）；JSON 内 `agentPromptNote` 同步。
+- **`cursor init`**：终端下一步改为**单一方式**（`@AGENT-SETUP-PROMPT.md`）；并提示 **Agent 完成后**执行 **`npm run fc:init`**（无 script 时用 **`npx figma-cache init`**）；JSON 内 `agentPromptNote` 同步。
 - **`AGENT-SETUP-PROMPT.md`**：收尾步骤补充「若无 `figma-cache/index.json` 则提示执行 cache init」。
 - **文档**：根 **`README.md`** 改为「四步」接入；**`figma-cache/docs/README.md`**、**`migration-guide.md`** 与上述流程对齐。
 

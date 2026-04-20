@@ -25,14 +25,14 @@
 
 ## 1.1 目标
 
-- 新增 `figma:ui:preflight`，先判断“是否具备开工条件”，减少无效生成。
-- 在 `figma:ui:gate` 中前置 preflight。
+- 新增 `fc:ui:preflight`，先判断“是否具备开工条件”，减少无效生成。
+- 在 `fc:ui:gate` 中前置 preflight。
 
 ## 1.2 交付物
 
 - `scripts/ui-preflight.js`
 - `figma-cache/reports/ui-preflight-report.json`
-- `package.json`：`figma:ui:preflight` + 更新 `figma:ui:gate`
+- `package.json`：`fc:ui:preflight` + 更新 `fc:ui:gate`
 - `tests/smoke.js`：preflight 正负样例
 
 ## 1.3 完成判定
@@ -64,7 +64,7 @@
      - `blocking[]`、`warnings[]`
 
 3. **gate 接入阈值**
-   - 新增 script：`figma:ui:audit`
+   - 新增 script：`fc:ui:audit`
    - 更新 gate：加入审计阈值（如 `score.total >= 85` 才放行）
 
 ## 2.3 技术策略

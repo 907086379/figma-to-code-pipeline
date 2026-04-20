@@ -17,11 +17,9 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci || npm install
-      - name: Cursor shadow check
-        run: npm run cursor:shadow:check
-      - name: Smoke tests
+      - name: Tests (verify + smoke)
         run: npm test
       - name: Figma cache validate
-        run: npm run figma:cache:validate
+        run: npm run fc:validate
       - name: Figma cache config
-        run: npm run figma:cache:config
+        run: npm run fc:config

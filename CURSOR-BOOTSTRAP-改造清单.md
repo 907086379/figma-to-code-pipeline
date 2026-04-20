@@ -1,4 +1,4 @@
-﻿# Cursor Bootstrap 改造清单（按步骤执行）
+# Cursor Bootstrap 改造清单（按步骤执行）
 
 目标：降低配置复杂度，避免 .cursor 冲突，并提升 Agent 一次性 1:1 还原成功率。
 
@@ -91,8 +91,8 @@
 - 保证 `sync` 与 `check` 用同一份清单。
 
 验收：
-- `npm run cursor:shadow:sync`
-- `npm run cursor:shadow:check`
+- `npm run verify:cursor:sync`
+- `npm run verify:cursor`
 - 两者都通过。
 
 回滚：
@@ -171,7 +171,7 @@
 
 动作：
 - 增加组合脚本，例如：
-  - `figma:ui:gate` = `figma:cache:validate + lint + (typecheck 或核心测试)`
+  - `fc:ui:gate` = `fc:validate + lint + (typecheck 或核心测试)`
 - 让 Agent 在“宣称完成 1:1”前必须跑该门禁。
 
 验收：
@@ -204,7 +204,7 @@
 
 - 2026-04-16 第 1 步完成：已新增 `cursor-bootstrap/managed-files.json`，明确 bootstrap 托管 rules/skills 白名单。
 - 2026-04-16 第 2 步完成：已改造 `scripts/sync-cursor-shadow.js` 与 `scripts/check-cursor-shadow.js`，统一读取 `cursor-bootstrap/managed-files.json`。
-- 2026-04-16 验收通过：`npm run cursor:shadow:sync` 与 `npm run cursor:shadow:check` 均通过。
+- 2026-04-16 验收通过：`npm run verify:cursor:sync` 与 `npm run verify:cursor` 均通过。
 - 2026-04-16 故障沉淀：已将 PowerShell `&&` 与 UTF-8 BOM 导致 Node 脚本/JSON 解析失败案例追加到 `.cursor/rules/local-command-execution-anti-regression.mdc`。
 
 ---
@@ -239,10 +239,10 @@
 - 2026-04-16 第 3 步完成：已将 `ui-baseline-governance` skill 并入 `figma-ui-dual-mode-execution`；托管清单已移除该 skill；`.cursor/skills/ui-baseline-governance/SKILL.md` 已移除。
 - 2026-04-16 第 4 步完成：`03-figma-ui-implementation-hard-constraints.mdc` 已合并 one-shot 与 evidence 口径；删除 `.cursor/rules/03-one-shot-ui-restoration.mdc`、`.cursor/rules/03-ui-implementation-evidence.mdc`。
 - 2026-04-16 第 6 步完成：`cursor init` 默认切换为安全模式（保留已有模板），新增 `--overwrite` 显式覆盖，`--force` 保持兼容旧语义（保留不覆盖）；CLI、README、docs、CHANGELOG、release notes、smoke 测试已同步。
-- 2026-04-16 第 7 步完成：已新增 `package.json` 脚本 `figma:ui:gate`，串联 `figma:cache:validate + cursor:shadow:check + npm test` 作为“一次性 1:1 交付门禁”。
-- 2026-04-16 全量验收通过：`cursor:shadow:sync/check`、`docs:encoding:check`、`npm test` 均通过。
+- 2026-04-16 第 7 步完成：已新增 `package.json` 脚本 `fc:ui:gate`，串联 `fc:validate + verify:cursor + npm test` 作为“一次性 1:1 交付门禁”。
+- 2026-04-16 全量验收通过：`verify:cursor:sync/check`、`verify:docs`、`npm test` 均通过。
 - 2026-04-16 第 0 步完成：已创建改造分支 `chore/cursor-governance-refactor`，用于冻结基线与可回滚执行。
 - 2026-04-16 Review补修完成：已修复 `--force` 兼容语义（保持旧行为：保留不覆盖），新增 `--overwrite` 覆盖模式互斥校验；并在 `managed-files.json` 增加 `retiredFiles`，`sync/check/cursor init` 已支持退役镜像清理与残留检测。
-- 2026-04-16 Review补修验收：新增 smoke 用例覆盖 `--force` 兼容、`--overwrite`、参数冲突报错、retired 文件自动清理；全链路 `cursor:shadow:sync/check + npm test` 通过。
+- 2026-04-16 Review补修验收：新增 smoke 用例覆盖 `--force` 兼容、`--overwrite`、参数冲突报错、retired 文件自动清理；全链路 `verify:cursor:sync/check + npm test` 通过。
 
 - 2026-04-16 极致清晰收口完成：本地规则已统一 `local-*` 命名，`04-command-execution-anti-regression.mdc` -> `local-command-execution-anti-regression.mdc`，`commit-conventions.mdc` -> `local-commit-conventions.mdc`；旧路径已加入 `retiredFiles` 清理。

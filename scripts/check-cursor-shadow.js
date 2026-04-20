@@ -86,7 +86,7 @@ function main() {
 
   if (errors.length) {
     process.stderr.write(
-      `[cursor-shadow:check] failed\n- ${errors.join("\n- ")}\nRun: npm run cursor:shadow:sync\n`
+      `[verify:cursor] failed\n- ${errors.join("\n- ")}\nRun: npm run verify:cursor:sync\n`
     );
     process.exit(1);
   }

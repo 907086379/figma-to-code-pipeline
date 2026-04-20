@@ -1,0 +1,16 @@
+{
+  "$schema": "https://example.invalid/ui-hard-constraints.schema.json",
+  "description": "Toolchain default UI hard constraints. Copied to target projects via `figma-cache cursor init` and enforced by `forbidden-markup-check.cjs`.",
+  "global": {
+    "forbiddenTags": ["button", "p", "ul", "li"],
+    "forbiddenAttrPrefixes": ["aria-"],
+    "forbiddenAttrNames": ["role", "tabindex"],
+    "forbiddenPatterns": [
+      { "id": "custom scrollbar wrapper: scrollbar-hint", "pattern": "\\bscrollbar-hint\\b" },
+      { "id": "custom scrollbar wrapper: hide-native-scrollbar", "pattern": "\\bhide-native-scrollbar\\b" },
+      { "id": "no CSS font-variation-settings (Figma MCP noise)", "pattern": "font-variation-settings" },
+      { "id": "no inline fontVariationSettings (React-style MCP dump)", "pattern": "fontVariationSettings\\s*:" }
+    ]
+  }
+}
+

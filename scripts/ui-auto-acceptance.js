@@ -11,6 +11,22 @@ const SCRIPT_DIR = __dirname;
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
 const FAIL_EXIT_CODE = 2;
 
+function normalizeNodeId(input) {
+  const v = String(input || "").trim();
+  if (!v) return "";
+  return v.includes(":") ? v : v.replace(/-/g, ":");
+}
+
+function rawJsonPathFromCacheKey(cacheKey) {
+  const ck = String(cacheKey || "").trim();
+  if (!ck || !ck.includes("#")) return "";
+  const [fileKey, nodeIdRaw] = ck.split("#");
+  const nodeId = normalizeNodeId(nodeIdRaw);
+  const safeNodeDir = String(nodeId).replace(/:/g, "-");
+  const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
+  return path.join(cacheDir, "files", fileKey, "nodes", safeNodeDir, "raw.json");
+}
+
 function resolveMaybeAbsolutePath(input) {
   if (!input) {
     return "";
@@ -182,6 +198,23 @@ function run() {
   const reportPaths = buildReportPaths(options);
 
   if (!options.reportsOnly) {
+    // Project icon registry rewrite (optional, but must happen BEFORE forbidden gate):
+    // If target project provides ui-icon-registry.json, rewrite icon-like <img> to icon classes.
+    if (options.cacheKey && target) {
+      const iconRewriteScript = path.join(SCRIPT_DIR, "ui-icon-rewrite.js");
+      runOrExit(`node "${iconRewriteScript}" --cacheKey=${options.cacheKey} --target="${target}"`);
+    }
+
+    // Enforce toolchain forbidden markup gate before running audit.
+    // This keeps cross-project workflows consistent with batch acceptance.
+    if (target) {
+      const forbiddenScript = path.join(SCRIPT_DIR, "forbidden-markup-check.cjs");
+      const ckArg = options.cacheKey ? ` --cacheKey=${options.cacheKey}` : "";
+      if (!runOrExit(`node "${forbiddenScript}" --file="${target}"${ckArg}`.trim())) {
+        process.exit(FAIL_EXIT_CODE);
+      }
+    }
+
     const preflightArgs = [];
     if (options.cacheKey) {
       preflightArgs.push(`--cacheKey=${options.cacheKey}`);
@@ -192,6 +225,24 @@ function run() {
     const preflightScript = path.join(SCRIPT_DIR, "ui-preflight.js");
     if (!runOrExit(`node "${preflightScript}" ${preflightArgs.join(" ")}`.trim())) {
       process.exit(FAIL_EXIT_CODE);
+    }
+
+    // Generate icon inset geometry for the target component folder (cross-project parity with accept:batch).
+    // If raw.json is present, this MUST succeed to avoid drifting artifacts.
+    if (options.cacheKey && target) {
+      const rawAbs = rawJsonPathFromCacheKey(options.cacheKey);
+      if (rawAbs && fs.existsSync(rawAbs)) {
+        const outDir = path.dirname(target);
+        const genScript = path.join(SCRIPT_DIR, "generate-icon-insets.cjs");
+        const ck = `${String(options.cacheKey).split("#")[0]}#${normalizeNodeId(String(options.cacheKey).split("#")[1])}`;
+        if (!runOrExit(`node "${genScript}" --raw="${rawAbs}" --out-dir="${outDir}" --cacheKey="${ck}"`.trim())) {
+          process.exit(FAIL_EXIT_CODE);
+        }
+      } else {
+        // Best-effort: preflight/audit may still pass without iconMetrics.
+        // Keep output minimal; do not fail the whole workflow for legacy cache items.
+        console.warn(`[ui-auto-acceptance] icon insets skipped (raw.json missing): ${rawAbs}`);
+      }
     }
 
     const auditArgs = [];

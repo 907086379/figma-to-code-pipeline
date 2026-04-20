@@ -183,6 +183,32 @@ function npmPackAndGetTarball() {
   return path.join(ROOT, fileName);
 }
 
+function ensureCursorBootstrapFiles(targetProject) {
+  const required = ["ui-hard-constraints.json", "ui-policy.json"];
+  const missing = required.filter((name) => !fs.existsSync(path.join(targetProject, name)));
+  if (!missing.length) {
+    return { ok: true, ran: false, missing: [] };
+  }
+  const binAbs = path.join(
+    targetProject,
+    "node_modules",
+    "figma-to-code-pipeline",
+    "bin",
+    "figma-cache.js"
+  );
+  if (!fs.existsSync(binAbs)) {
+    // If the package isn't installed yet, caller will re-run after install.
+    return { ok: false, ran: false, missing, reason: `figma-cache bin missing: ${binAbs}` };
+  }
+  // Safe mode: do not overwrite existing files; only fill missing bootstrap artifacts.
+  runCommand(`node "${binAbs}" cursor init`, targetProject);
+  const stillMissing = required.filter((name) => !fs.existsSync(path.join(targetProject, name)));
+  if (stillMissing.length) {
+    return { ok: false, ran: true, missing: stillMissing, reason: "cursor init did not write required files" };
+  }
+  return { ok: true, ran: true, missing: [] };
+}
+
 function readJsonOrNull(absPath) {
   try {
     return JSON.parse(fs.readFileSync(absPath, "utf8"));
@@ -463,6 +489,17 @@ function run() {
   try {
     tarballPath = npmPackAndGetTarball();
     runCommand(`npm i -D "${tarballPath}"`, targetProject);
+
+    // Ensure toolchain bootstrap artifacts are present in target project (for new repos / new agents).
+    // This makes cross-project workflow self-contained and avoids "forgot to cursor init" drift.
+    const bootstrap = ensureCursorBootstrapFiles(targetProject);
+    if (!bootstrap.ok) {
+      throw new Error(
+        `cursor bootstrap incomplete: ${bootstrap.reason || "unknown"}; missing: ${JSON.stringify(
+          bootstrap.missing || []
+        )}`
+      );
+    }
 
     const acceptScript = path.join(
       targetProject,

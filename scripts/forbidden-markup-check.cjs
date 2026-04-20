@@ -14,11 +14,20 @@ const ROOT = process.cwd();
 const DEFAULT_CONSTRAINTS_PATH = path.join(ROOT, "ui-hard-constraints.json");
 const DEFAULT_POLICY_PATH = path.join(ROOT, "ui-policy.json");
 const DEFAULT_PLATFORM = "web-vue";
+const PACKAGE_DEFAULT_CONSTRAINTS_PATH = path.join(
+  __dirname,
+  "..",
+  "cursor-bootstrap",
+  "examples",
+  "ui-hard-constraints.json"
+);
+const PACKAGE_DEFAULT_POLICY_PATH = path.join(__dirname, "..", "cursor-bootstrap", "examples", "ui-policy.json");
 
 function parseArgs(argv) {
   const out = {
     batch: path.join(ROOT, "figma-e2e-batch.json"),
     files: [],
+    cacheKey: "",
     constraints: DEFAULT_CONSTRAINTS_PATH,
     policy: DEFAULT_POLICY_PATH,
     platform: DEFAULT_PLATFORM,
@@ -31,6 +40,10 @@ function parseArgs(argv) {
     }
     if (arg.startsWith("--file=")) {
       out.files.push(arg.split("=").slice(1).join("=").trim());
+      return;
+    }
+    if (arg.startsWith("--cacheKey=")) {
+      out.cacheKey = arg.split("=").slice(1).join("=").trim();
       return;
     }
     if (arg.startsWith("--constraints=")) {
@@ -57,6 +70,12 @@ function readJsonIfExists(absPath) {
   if (!absPath) return null;
   if (!fs.existsSync(absPath)) return null;
   return JSON.parse(fs.readFileSync(absPath, "utf8"));
+}
+
+function readJsonWithFallback(primaryAbs, fallbackAbs) {
+  const primary = readJsonIfExists(primaryAbs);
+  if (primary) return primary;
+  return readJsonIfExists(fallbackAbs);
 }
 
 function resolveAdapterPath(platform, adapterArg) {
@@ -160,8 +179,64 @@ function readBatchTargets(batchPath) {
     const absTarget = path.isAbsolute(target) ? path.normalize(target) : path.join(ROOT, target);
     const constraintsOverride = item && item.constraints ? item.constraints : null;
     const policyOverride = item && item.policy ? item.policy : null;
-    return { absTarget, constraintsOverride, policyOverride };
+    const fileKey = String(item && item.fileKey ? item.fileKey : "").trim();
+    const nodeId = String(item && item.nodeId ? item.nodeId : "").trim();
+    const cacheKey =
+      String(item && item.cacheKey ? item.cacheKey : "").trim() || (fileKey && nodeId ? `${fileKey}#${nodeId}` : "");
+    return { absTarget, constraintsOverride, policyOverride, cacheKey };
   });
+}
+
+function findIconRegistryAbs() {
+  const candidates = [
+    path.join(ROOT, "ui-icon-registry.json"),
+    path.join(ROOT, "figma-cache", "adapters", "ui-icon-registry.json"),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) || "";
+}
+
+function normalizeNodeId(input) {
+  const v = String(input || "").trim();
+  if (!v) return "";
+  return v.includes(":") ? v : v.replace(/-/g, ":");
+}
+
+function rawJsonAbsFromCacheKey(cacheKey) {
+  const ck = String(cacheKey || "").trim();
+  if (!ck || !ck.includes("#")) return "";
+  const [fileKey, nodeIdRaw] = ck.split("#");
+  const nodeId = normalizeNodeId(nodeIdRaw);
+  const safeNodeDir = String(nodeId).replace(/:/g, "-");
+  return path.join(ROOT, "figma-cache", "files", fileKey, "nodes", safeNodeDir, "raw.json");
+}
+
+function compileRegistryIconMap(registryRaw, rawJson) {
+  const entries = Array.isArray(registryRaw && registryRaw.entries) ? registryRaw.entries : [];
+  const metrics = Array.isArray(rawJson && rawJson.iconMetrics) ? rawJson.iconMetrics : [];
+  const out = {};
+  metrics.forEach((m) => {
+    const name = String(m && m.name ? m.name : "").trim();
+    const nodeId = String(m && m.nodeId ? m.nodeId : "").trim();
+    if (!name || !nodeId) return;
+    for (const entry of entries) {
+      const className = String(entry && entry.className ? entry.className : "").trim();
+      const matchers =
+        entry && entry.match && Array.isArray(entry.match.figmaNodeNameRegex) ? entry.match.figmaNodeNameRegex : [];
+      if (!className || !matchers.length) continue;
+      const ok = matchers.some((pat) => {
+        try {
+          return new RegExp(String(pat), "i").test(name);
+        } catch {
+          return false;
+        }
+      });
+      if (ok) {
+        out[nodeId] = className;
+        break;
+      }
+    }
+  });
+  return out;
 }
 
 function applyPolicyOverride(basePolicy, policyOverride) {
@@ -178,9 +253,33 @@ function applyPolicyOverride(basePolicy, policyOverride) {
   return next;
 }
 
-function scanFile(absPath, constraints) {
+function scanFile(absPath, constraints, cacheKey) {
   const content = fs.readFileSync(absPath, "utf8");
   const violations = [];
+
+  // Require generated UI root reset class on the first element inside <template>.
+  // This keeps generated components visually stable and avoids browser default margins/line-heights.
+  if (String(absPath || "").toLowerCase().endsWith(".vue")) {
+    const templateMatch = content.match(/<template[^>]*>([\s\S]*?)<\/template>/i);
+    const templateBody = templateMatch ? String(templateMatch[1] || "") : "";
+    // First non-comment element tag in template.
+    const firstTagMatch = templateBody.match(
+      /<(?!\/)([a-zA-Z][\w-]*)([\s\S]*?)(\/?)>/m
+    );
+    if (firstTagMatch) {
+      const attrs = String(firstTagMatch[2] || "");
+      const hasStatic =
+        /\bclass\s*=\s*["'][^"']*\bgenerate-ui-reset\b[^"']*["']/i.test(attrs);
+      const hasBound =
+        /\b:class\s*=\s*["'][^"']*\bgenerate-ui-reset\b[^"']*["']/i.test(attrs) ||
+        /\bv-bind:class\s*=\s*["'][^"']*\bgenerate-ui-reset\b[^"']*["']/i.test(attrs);
+      if (!hasStatic && !hasBound) {
+        violations.push("missing generate-ui-reset on template root element");
+      }
+    } else {
+      violations.push("missing template root element");
+    }
+  }
 
   constraints.forbiddenTags.forEach((tag) => {
     const re = new RegExp(`<\\s*${tag}(\\s|>|/)`, "gi");
@@ -220,6 +319,30 @@ function scanFile(absPath, constraints) {
     violations.push("forbidden icon img classes: max-w-none + inset-0 + size-full (causes icon stretching)");
   }
 
+  // Icon registry gate (project-defined): if registry exists and cacheKey is known,
+  // require the target file to contain the expected icon class for any registry-matched iconMetrics nodeId.
+  const registryAbs = findIconRegistryAbs();
+  if (registryAbs && cacheKey) {
+    const rawAbs = rawJsonAbsFromCacheKey(cacheKey);
+    if (rawAbs && fs.existsSync(rawAbs)) {
+      try {
+        const registryRaw = JSON.parse(fs.readFileSync(registryAbs, "utf8"));
+        const rawJson = JSON.parse(fs.readFileSync(rawAbs, "utf8"));
+        const iconMap = compileRegistryIconMap(registryRaw, rawJson);
+        Object.keys(iconMap).forEach((nodeId) => {
+          const cls = iconMap[nodeId];
+          if (!cls) return;
+          // Heuristic: generated components often carry nodeId literals in code; if present, require the icon class too.
+          if (content.includes(nodeId) && !content.includes(cls)) {
+            violations.push(`icon registry missing class for ${nodeId}: expected ${cls}`);
+          }
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   return violations;
 }
 
@@ -230,12 +353,12 @@ function main() {
   const adapterPathRaw = resolveAdapterPath(args.platform, args.adapter);
   const adapterPath = path.isAbsolute(adapterPathRaw) ? adapterPathRaw : path.join(ROOT, adapterPathRaw);
 
-  const policyRaw = readJsonIfExists(policyPath);
+  const policyRaw = readJsonWithFallback(policyPath, PACKAGE_DEFAULT_POLICY_PATH);
   const adapterRaw = readJsonIfExists(adapterPath);
   const canUsePolicy = Boolean(policyRaw && adapterRaw);
 
   const constraintsPath = path.isAbsolute(args.constraints) ? args.constraints : path.join(ROOT, args.constraints);
-  const legacyConstraintsRaw = readJsonIfExists(constraintsPath) || {
+  const legacyConstraintsRaw = readJsonWithFallback(constraintsPath, PACKAGE_DEFAULT_CONSTRAINTS_PATH) || {
     global: {
       forbiddenTags: ["button", "p", "ul", "li"],
       forbiddenAttrPrefixes: ["aria-"],
@@ -256,7 +379,7 @@ function main() {
     .filter(Boolean);
 
   const batchItems = explicitFiles.length
-    ? explicitFiles.map((absTarget) => ({ absTarget, constraintsOverride: null, policyOverride: null }))
+    ? explicitFiles.map((absTarget) => ({ absTarget, constraintsOverride: null, policyOverride: null, cacheKey: args.cacheKey }))
     : readBatchTargets(args.batch);
 
   const missing = batchItems.map((x) => x.absTarget).filter((p) => !fs.existsSync(p));
@@ -272,7 +395,7 @@ function main() {
       ? normalizeConstraints(compileConstraintsFromPolicy(applyPolicyOverride(policyRaw, item.policyOverride), adapterRaw))
       : globalConstraints;
     const effective = mergeConstraints(compiledForCase, item.constraintsOverride);
-    const violations = scanFile(item.absTarget, effective);
+    const violations = scanFile(item.absTarget, effective, item.cacheKey);
     if (violations.length) {
       allViolations.push({ file: item.absTarget, violations });
     }

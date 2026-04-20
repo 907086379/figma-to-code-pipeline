@@ -1,0 +1,6 @@
+{
+  "$schema": "https://example.invalid/ui-policy.schema.json",
+  "description": "Toolchain default UI policy (optional). If the project also provides an adapter file (ui-adapter.<platform>.json), forbidden-markup-check can compile primitive constraints from policy+adapter.",
+  "forbiddenPrimitives": []
+}
+

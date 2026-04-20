@@ -70,7 +70,7 @@ npm run fc:config
 - `npm run fc:ui:audit -- --min-score=85`
 - `npm run fc:ui:report:aggregate`
 - `npm run fc:ui:accept -- --target=<componentPath>`
-- `npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
+- `npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel/index.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
 - `npm run fc:ui:gate`
 - `npm run fc:ui:gate:pr`
 - `npm run fc:ui:gate:main`
@@ -83,11 +83,13 @@ npm run fc:config
 
 ### Fresh 重生成回归（推荐）
 
-- 目标项目推荐一条命令：`npm run figma:workflow:fresh:one-shot`（删 -> 等文件 -> 验收 + build）
+以下脚本名需在**目标业务项目**的 `package.json` 中定义（本仓库的 `vue-demo` 已提供同名示例：`fc:workflow:fresh:*`）。
+
+- 目标项目推荐一条命令：`npm run fc:workflow:fresh:one-shot`（删 -> 等文件 -> 验收 + build）
 - 备选拆分：
-  - `npm run figma:workflow:fresh:start`（删除 target，并要求“缺失目标失败”）
-  - `npm run figma:workflow:fresh:verify`（Agent 重生成后验收通过）
-  - `npm run figma:workflow:fresh:wait-verify`（仅等待 target 出现后自动验收）
+  - `npm run fc:workflow:fresh:start`（删除 target，并要求“缺失目标失败”）
+  - `npm run fc:workflow:fresh:verify`（Agent 重生成后验收通过）
+  - `npm run fc:workflow:fresh:wait-verify`（仅等待 target 出现后自动验收）
 - `cross-project-e2e` 默认开启真实组件链路保护：`target` 缺失或出现 `code-level comparison skipped` 会直接失败
 
 ### UI preflight（P0 门禁）

@@ -16,7 +16,7 @@
 在目标项目执行（默认最多等 30 分钟；超时退出码 2）：
 
 ```bash
-npm run figma:workflow:fresh:one-shot
+npm run fc:workflow:fresh:one-shot
 ```
 
 然后你只需要做一件事：**新开 Agent 会话重生成组件**（脚本会自动轮询 `figma-e2e-batch.json` 里的 `target` 文件是否出现）。
@@ -28,19 +28,19 @@ npm run figma:workflow:fresh:one-shot
 1) 删并确认失败：
 
 ```bash
-npm run figma:workflow:fresh:start
+npm run fc:workflow:fresh:start
 ```
 
 2) Agent 重生成后，只跑验收：
 
 ```bash
-npm run figma:workflow:fresh:verify
+npm run fc:workflow:fresh:verify
 ```
 
 或只“等待文件出现后自动验收”（**不先删**；适合你已经手动删过文件、或只想等 Agent 写完再验）：
 
 ```bash
-npm run figma:workflow:fresh:wait-verify
+npm run fc:workflow:fresh:wait-verify
 ```
 
 ---
@@ -81,7 +81,7 @@ npx figma-cache cursor init
 
 补充（多根工作区本地联调推荐）：
 
-- 若你的 `vue-demo/package.json` 已配置 `figma-to-code-pipeline` 为本地源码依赖（例如 `file:../figma-cache-v1`，或与目录名一致的 `file:../figma-to-code-pipeline`），则不需要安装 `@latest`。
+- 若你的 `vue-demo/package.json` 已配置 `figma-to-code-pipeline` 为本地源码依赖（推荐 `file:../figma-to-code-pipeline`，与父工作区目录名一致），则不需要安装 `@latest`。
 - 本地源码联调时建议用 `npm install` 刷新依赖即可；仅在需要“验证发布包”时再用 `npm pack`/tgz 或 `@latest`。
 
 ### 3.2 准备批量文件（推荐）
@@ -93,7 +93,7 @@ npx figma-cache cursor init
   {
     "fileKey": "53hw0wDvgOzH14DXSsnEmE",
     "nodeId": "9277-28772",
-    "target": "./src/pages/main/components/AudioSettingsPanel.vue",
+    "target": "./src/pages/main/components/AudioSettingsPanel/index.vue",
     "minScore": 85,
     "maxWarnings": 10,
     "maxDiffs": 10
@@ -162,7 +162,7 @@ npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo
 在目标项目执行：
 
 ```bash
-npm run figma:workflow:fresh:start
+npm run fc:workflow:fresh:start
 ```
 
 该命令会：
@@ -174,19 +174,19 @@ npm run figma:workflow:fresh:start
 Agent 重生成完成后，在目标项目执行：
 
 ```bash
-npm run figma:workflow:fresh:verify
+npm run fc:workflow:fresh:verify
 ```
 
-如果你已经手动删除了 `target` 文件（例如 `AudioSettingsPanel.vue`），可以直接从等待/验收开始：
+如果你已经手动删除了 `target` 文件（例如 `AudioSettingsPanel/index.vue`），可以直接从等待/验收开始：
 
 ```bash
-npm run figma:workflow:fresh:wait-verify
+npm run fc:workflow:fresh:wait-verify
 ```
 
 或在你确认组件已生成后直接跑：
 
 ```bash
-npm run figma:workflow:fresh:verify
+npm run fc:workflow:fresh:verify
 ```
 
 该命令会：
@@ -201,7 +201,7 @@ npm run figma:workflow:fresh:verify
 ### 模式 A：单节点快速验证
 
 ```bash
-npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=53hw0wDvgOzH14DXSsnEmE --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel.vue --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
+npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=53hw0wDvgOzH14DXSsnEmE --nodeId=9277-28772 --target=./src/pages/main/components/AudioSettingsPanel/index.vue --auto-ensure-on-miss --fix-loop=2 --emit-agent-task-on-fail
 ```
 
 ### 模式 B：批量回归（推荐日常）
@@ -222,7 +222,7 @@ npm run fc:ui:e2e:cross -- --target-project=../vue-demo --batch-file=../vue-demo
 
 - 日常开发：模式 B（batch）
 - 发布前：模式 C（strict）
-- 真实性回归：先跑 Fresh start，再新会话重生成，再跑 Fresh verify
+- 真实性回归：先跑 `fc:workflow:fresh:start`，再新会话重生成，再跑 `fc:workflow:fresh:verify`
 - 失败：让 Agent 接手 `agent-task.md`，不要手工盲改
 - 稳定后再收紧阈值（`minScore`、`maxWarnings`、`maxDiffs`）
 

@@ -2,18 +2,22 @@
 
 本文件记录 **对外发布**（npm）时建议同步更新的变更。仓库内日常迭代可只写 Git commit message；发版前将本条目下的 **Unreleased** 归并到新版本号。
 
+## Unreleased
+
+## 3.0.1（2026-04-21）
+
+- 文档：仓库根 **`docs/`** 合并为人读总览 **`docs/README.md`**（含原 `cursor-local-governance`、`mobile-native-adapter-template`）；**`docs/figma-flow-readme.md`** 保留为 `postEnsure` 默认登记骨架并去除过时示例节点。
+- 文档：`figma:workflow:fresh:*` 与 `figma-cache-v1` 等过时表述已对齐为 `fc:workflow:fresh:*` 与 `figma-to-code-pipeline`；根目录重复的 `RELEASE-NOTES-2.0.x.md` 已移除。
+- 文档：根 **`README.md`** 收紧为入口页，细则指向 **`figma-cache/docs/README.md`**。
+- `fc:ui:e2e:cross`：single/batch 下 `--target` 文件不存在时直接失败；默认阻断 `code-level comparison skipped`（可用 `--allow-skipped-code-level-comparison` 显式放行）。
+- `tests/smoke-cross-project-and-cursor-init.js`：补充 cross-project-e2e 缺失 `--target-project` / `--target` / 目标文件不存在等失败用例。
+
 ## 3.0.0（2026-04-20）
 
 - **Breaking：npm 包名**：`figma-cache-toolchain` → **`figma-to-code-pipeline`**（CLI 命令 **`figma-cache`** 不变）。建议将本地源码目录重命名为 `figma-to-code-pipeline`，并把 `vue-demo` 的 `file:` 依赖改为 `file:../figma-to-code-pipeline`；在重命名完成前可使用 `file:../figma-cache-v1`。
 - **Breaking：npm scripts 命名空间**：`figma:cache:*` → `fc:*`，`figma:ui:*` → `fc:ui:*`；`cursor:shadow:*` → `verify:cursor*`；`docs:encoding:check` → `verify:docs`；`preflight:shell*` → `verify:shell*`。
 - **门禁结构**：`verify:static`（Cursor 镜像 + 文档编码）与 `test:node`（规则守卫 + 单测 + smoke）拆分；`fc:ui:gate*` 不再重复跑两遍静态校验。
 - **发布前**：`prepack` 增加 `verify:pack`（按 `files` 展开校验关键路径，不调用 `npm pack`，避免生命周期递归）。
-
-## Unreleased
-
-- `fc:ui:e2e:cross` 增加真实组件链路防呆：single/batch 模式下 `--target` 文件不存在时直接失败。
-- `fc:ui:e2e:cross` 默认阻断 `code-level comparison skipped`（可用 `--allow-skipped-code-level-comparison` 显式放行兼容旧流程），避免未绑定真实组件路径时出现假阳性通过。
-- `tests/smoke.js` 补充 cross-project-e2e 缺失目标文件的失败用例，覆盖上述行为。
 
 ## 2.0.3（2026-04-16）
 

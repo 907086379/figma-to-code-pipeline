@@ -137,7 +137,7 @@
 ## 第 5 步：建立本地规则命名规范
 
 动作：
-- 新增本地专用约定文档：`docs/cursor-local-governance.md`。
+- 本地与人读约定已并入 **`docs/README.md`**（原 `docs/cursor-local-governance.md` / `docs/mobile-native-adapter-template.md` 内容合并）。
 - 明确：
   - 托管规则只在 `cursor-bootstrap` 手写。
   - `.cursor` 是镜像，不手改。
@@ -230,7 +230,7 @@
 ## 执行进度日志（续）
 
 - 2026-04-16 专项完成：已新增本地规则 `.cursor/rules/local-command-execution-safety.mdc`，固化 PowerShell 与 BOM 防错。
-- 2026-04-16 第 5 步完成：已新增 `docs/cursor-local-governance.md`，明确托管层/本地层边界与命名规范。
+- 2026-04-16 第 5 步完成：已明确托管层/本地层边界与命名规范（现统一见 **`docs/README.md`** 第 2 节）。
 
 ---
 

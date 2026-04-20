@@ -173,6 +173,7 @@ npm run fc:flow:mermaid -- --flow=<flowId>
 - 建议提交：`.cursor/`、`figma-cache.config.js`、`AGENT-SETUP-PROMPT.md`、`package.json`/lock。
 - `figma-cache/index.json` 与 `figma-cache/files/` 是否入库，由团队统一约定。
 - 若使用流程文档，建议同步维护 `docs/figma-flow-readme.md`（或 `FIGMA_CACHE_FLOW_README` 指定路径）。
+- 若你**克隆工具链源码仓库**（而非仅从 npm 使用包），可阅读仓库根目录 **`docs/README.md`**：人读总览（当前工作流、`figma-flow-readme` 与 postEnsure 分工、Cursor 托管/本地治理、移动端规格可选流程）。
 
 ---
 

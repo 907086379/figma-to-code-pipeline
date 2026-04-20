@@ -21,6 +21,10 @@
       "to": ".cursor/rules/04-ui-baseline-governance.mdc"
     },
     {
+      "from": "rules/05-ui-batch-target-and-mounting.mdc",
+      "to": ".cursor/rules/05-ui-batch-target-and-mounting.mdc"
+    },
+    {
       "from": "rules/figma-local-cache-first.mdc",
       "to": ".cursor/rules/figma-local-cache-first.mdc"
     },
@@ -31,6 +35,14 @@
     {
       "from": "skills/figma-ui-dual-mode-execution/SKILL.md",
       "to": ".cursor/skills/figma-ui-dual-mode-execution/SKILL.md"
+    },
+    {
+      "from": "examples/ui-hard-constraints.json",
+      "to": "ui-hard-constraints.json"
+    },
+    {
+      "from": "examples/ui-policy.json",
+      "to": "ui-policy.json"
     }
   ],
   "retiredFiles": [

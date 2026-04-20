@@ -1,0 +1,48 @@
+---
+description: UI Batch 目标路径/命名/自动挂载约束（面向 demo/联调）
+alwaysApply: true
+---
+
+# UI Batch：目标路径、命名与自动挂载（强约束）
+
+本规则用于把“批量节点 -> 生成组件 -> 在目标项目真实运行/验收”的流程工程化，避免靠临时长提示词维持一致性。
+
+## 1) 目标路径（target）是唯一真源
+- UI E2E / fresh workflow 都以 `figma-e2e-batch.json` 的 `target` 为准。
+- 生成/修复组件时，必须写到 `target` 指定的文件路径（相对项目根目录）。
+
+## 2) 命名必须严格 PascalCase
+- 组件目录名必须严格 PascalCase：`^[A-Z][A-Za-z0-9]*$`
+- 禁止出现下划线风格（例如 `Figma_9277_28654`）。
+- 若没有业务语义名，默认用可追溯 node-id 的安全名：
+  - `node-id=9277-28654` → `FigmaNode9277x28654`
+
+## 3) 使用工具链维护 batch（而非手写 target）
+优先使用工具链脚本更新 batch，以确保命名/target 模板一致：
+- `node node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" --fileKey=<fileKey>`
+- 可选：
+  - `--component=<StrictPascalCase>`
+  - `--target-root=...`
+  - 项目根放置 `figma-ui-batch.config.json` 统一配置 `targetRoot/targetTemplate`
+
+## 4) 自动挂载到页面（用于真实运行验证）
+为保证“生成即能看见”，每次生成/修复 batch 目标组件后，必须把它挂载到页面用于运行验证：
+
+- 挂载点优先级：
+  - 若项目根存在 `figma-ui-batch.config.json` 且配置了 `uiBatch.mountPage`：使用该路径
+  - 否则默认挂载点：`src/pages/main/index.vue`
+- 挂载方式：
+  - 在 `<script setup>` 里 import `target` 对应的组件
+  - 在 `<template>` 里渲染该组件一次
+
+可选（推荐工程化）：直接用工具链脚本自动完成挂载：
+- `node node_modules/figma-to-code-pipeline/scripts/ui-mount-batch.cjs --batch=./figma-e2e-batch.json`
+
+约束：
+- 挂载只用于 demo/联调，不要引入额外依赖。
+- 若项目已有约定的演示页/路由入口，可按项目约定替换挂载点，但必须确保可运行可见。
+
+## 5) 生成后必须验收（不要只看页面）
+- 必须在目标项目运行 UI batch 验收链路（例如 `npm run fc:ui:accept:batch`）。
+- 如项目要求，也应运行 `npm run build` 以捕获 SFC 语法/依赖问题。
+

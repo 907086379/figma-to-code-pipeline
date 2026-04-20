@@ -25,6 +25,10 @@
       "to": ".cursor/rules/05-ui-batch-target-and-mounting.mdc"
     },
     {
+      "from": "rules/06-commit-message-chinese-only.mdc",
+      "to": ".cursor/rules/06-commit-message-chinese-only.mdc"
+    },
+    {
       "from": "rules/figma-local-cache-first.mdc",
       "to": ".cursor/rules/figma-local-cache-first.mdc"
     },

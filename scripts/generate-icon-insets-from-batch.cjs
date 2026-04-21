@@ -12,6 +12,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 const {
   mergeIconMetricsFromRawPaths,
   buildTsBundled,
@@ -25,13 +26,6 @@ function normalizeNodeId(input) {
   const value = String(input || "").trim();
   if (!value) return "";
   return value.includes(":") ? value : value.replace(/-/g, ":");
-}
-
-function cacheKeyFromItem(item) {
-  const fileKey = String(item && item.fileKey ? item.fileKey : "").trim();
-  const nodeId = String(item && item.nodeId ? item.nodeId : "").trim();
-  if (!fileKey || !nodeId) return "";
-  return `${fileKey}#${normalizeNodeId(nodeId)}`;
 }
 
 function normalizeCacheKey(input) {
@@ -144,18 +138,18 @@ function main() {
     console.error(`[generate-icon-insets-from-batch] batch not found: ${batchAbs}`);
     process.exit(2);
   }
-  const payload = JSON.parse(fs.readFileSync(batchAbs, "utf8"));
-  if (!Array.isArray(payload) || payload.length === 0) {
-    console.error("[generate-icon-insets-from-batch] batch must be a non-empty array");
-    process.exit(2);
-  }
+  const batch = readBatchV2(batchAbs, ROOT);
 
   const prepared = [];
-  payload.forEach((item, idx) => {
-    const cacheKey = String(item && (item.cacheKey || cacheKeyFromItem(item)) || "").trim();
-    const targetAbs = resolveTargetAbs(item && item.target);
-    const relatedCacheKeysExplicit = toRelatedCacheKeys(item);
-    const relatedCacheKeysFromUrls = toRelatedUrls(item)
+  batch.cases.forEach((item) => {
+    const kind = String(item && item.target && item.target.kind ? item.target.kind : "").trim();
+    if (kind === "html") {
+      return;
+    }
+    const cacheKey = String(item && item.cacheKey ? item.cacheKey : "").trim();
+    const targetAbs = resolveTargetAbs(item && item.target ? item.target.entry : "");
+    const relatedCacheKeysExplicit = toRelatedCacheKeys(item && item._raw ? item._raw : {});
+    const relatedCacheKeysFromUrls = toRelatedUrls(item && item._raw ? item._raw : {})
       .map(extractCacheKeyFromFigmaUrl)
       .map(normalizeCacheKey)
       .filter(Boolean);
@@ -163,14 +157,8 @@ function main() {
     const relatedCacheKeys = Array.from(
       new Set([...relatedCacheKeysExplicit, ...relatedCacheKeysFromUrls, ...relatedCacheKeysFromFlow])
     ).filter(Boolean);
-    if (!cacheKey) {
-      console.error(`[generate-icon-insets-from-batch] case[${idx}] missing cacheKey or (fileKey+nodeId)`);
-      process.exit(2);
-    }
-    if (!targetAbs) {
-      console.error(`[generate-icon-insets-from-batch] case[${idx}] missing target`);
-      process.exit(2);
-    }
+    if (!cacheKey) throw new Error("[generate-icon-insets-from-batch] cacheKey 为空（不应发生）");
+    if (!targetAbs) throw new Error(`[generate-icon-insets-from-batch] case[${item.index}] target.entry 为空（不应发生）`);
     const rawAbsList = rawAbsPathsForCase(cacheKey, relatedCacheKeys);
     const rawKeyOrder = [cacheKey, ...relatedCacheKeys];
     rawAbsList.forEach((rawAbs, j) => {
@@ -180,7 +168,7 @@ function main() {
         process.exit(2);
       }
     });
-    prepared.push({ idx, cacheKey, targetAbs, targetDir: path.dirname(targetAbs), rawAbsList });
+    prepared.push({ idx: item.index, cacheKey, targetAbs, targetDir: path.dirname(targetAbs), rawAbsList });
   });
 
   const byTarget = new Map();

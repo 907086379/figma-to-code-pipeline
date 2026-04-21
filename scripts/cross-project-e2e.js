@@ -5,6 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const FAIL_EXIT_CODE = 2;
@@ -227,24 +228,24 @@ function writeAgentTask(targetProject, options, payload) {
     ? resolveMaybeAbsolutePath(options.agentTaskPath)
     : defaultPath;
   const lines = [];
-  lines.push("# Agent Task: UI E2E Recovery");
+  lines.push("# Agent 任务：UI E2E 修复接力");
   lines.push("");
-  lines.push("## Goal");
-  lines.push("Fix target project implementation so ui acceptance passes.");
+  lines.push("## 目标");
+  lines.push("修复目标项目实现，使 UI 验收链路通过。");
   lines.push("");
-  lines.push("## Constraints");
-  lines.push("- Must run ui acceptance after code changes.");
-  lines.push("- Do not bypass by lowering thresholds unless explicitly requested.");
-  lines.push("- Prioritize real component/contract/recipe fixes.");
+  lines.push("## 约束");
+  lines.push("- 修改代码后必须运行 UI 验收。");
+  lines.push("- 未明确要求时，不要通过降低阈值来绕过失败。");
+  lines.push("- 优先修复真实组件/contract/recipe 等根因。");
   lines.push("");
-  lines.push("## Context");
+  lines.push("## 上下文");
   lines.push(`- targetProject: ${normalizeSlash(payload.targetProject || "")}`);
   lines.push(`- mode: ${payload.mode || "single"}`);
   lines.push(`- profile: ${payload.profile || "standard"}`);
   lines.push(`- autoEnsureOnMiss: ${payload.autoEnsureOnMiss ? "true" : "false"}`);
   lines.push(`- fixLoop: ${Number(payload.fixLoop || 0)}`);
   lines.push("");
-  lines.push("## Cases");
+  lines.push("## 失败用例");
   (payload.cases || []).forEach((entry, idx) => {
     lines.push(`### Case ${idx + 1}`);
     lines.push(`- cacheKey: ${entry.cacheKey || ""}`);
@@ -260,17 +261,17 @@ function writeAgentTask(targetProject, options, payload) {
     }
     lines.push("");
   });
-  lines.push("## Required Command");
-  lines.push("Run this command in toolchain repo after fixes:");
+  lines.push("## 必须执行的命令");
+  lines.push("修复完成后，在 toolchain 仓库重新运行：");
   lines.push("");
   lines.push("```bash");
   lines.push(payload.retryCommand || "npm run fc:ui:e2e:cross -- --target-project=<...>");
   lines.push("```");
   lines.push("");
-  lines.push("## Completion Criteria");
-  lines.push("- e2e command exits with code 0");
-  lines.push("- summaryStatus is healthy");
-  lines.push("- no unresolved blocking items");
+  lines.push("## 完成标准");
+  lines.push("- e2e 命令退出码为 0");
+  lines.push("- summaryStatus 为 healthy");
+  lines.push("- 无未解决的 blocking 项");
   lines.push("");
 
   fs.mkdirSync(path.dirname(taskPath), { recursive: true });
@@ -365,6 +366,8 @@ function runSingleCase(input, context) {
       ? Number(input.maxWarnings)
       : options.maxWarnings,
     maxDiffs: Number.isFinite(Number(input.maxDiffs)) ? Number(input.maxDiffs) : options.maxDiffs,
+    auditMode: input.auditMode || "",
+    targetKind: input.targetKind || "",
   };
   const cacheKey = item.cacheKey || resolveCacheKey(item);
   if (!cacheKey) {
@@ -385,6 +388,12 @@ function runSingleCase(input, context) {
     `--max-warnings=${item.maxWarnings}`,
     `--max-diffs=${item.maxDiffs}`,
   ];
+  if (item.auditMode) {
+    acceptArgs.push(`--audit-mode=${item.auditMode}`);
+  }
+  if (item.targetKind) {
+    acceptArgs.push(`--target-kind=${item.targetKind}`);
+  }
   const env = {};
   if (options.profile) {
     env.FIGMA_UI_PROFILE = options.profile;
@@ -516,11 +525,16 @@ function run() {
     const cases = isBatchMode
       ? (() => {
           const batchPath = resolveMaybeAbsolutePath(options.batchFile);
-          const payload = readJsonOrNull(batchPath);
-          if (!Array.isArray(payload) || !payload.length) {
-            throw new Error(`invalid batch file: ${batchPath}`);
-          }
-          return payload;
+          const batch = readBatchV2(batchPath, path.dirname(batchPath));
+          return batch.cases.map((c) => ({
+            cacheKey: c.cacheKey,
+            target: c.target.entry,
+            minScore: c.limits.minScore,
+            maxWarnings: c.limits.maxWarnings,
+            maxDiffs: c.limits.maxDiffs,
+            auditMode: c.audit && c.audit.mode ? c.audit.mode : "",
+            targetKind: c.target && c.target.kind ? c.target.kind : "",
+          }));
         })()
       : [
           {

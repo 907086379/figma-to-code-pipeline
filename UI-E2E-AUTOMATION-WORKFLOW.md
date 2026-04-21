@@ -56,7 +56,7 @@ npm run fc:workflow:fresh:wait-verify
 ## 2. 核心能力一览
 
 - `fc:ui:e2e:cross`：跨项目联调总控（本仓库执行）
-  - 自动 `npm pack` 当前包并安装到目标项目
+  - 自动 `npm pack` 当前包并安装到目标项目（驱动目标侧脚本；**与本工作区 demo 在 `package.json` 使用 `file:../figma-to-code-pipeline` 的目录依赖约定并存**——日常改工具链无需手搓 tgz）
   - 自动执行目标项目验收链路
   - 支持 cache miss 自动补齐
   - 支持失败自动重试
@@ -84,37 +84,41 @@ npx figma-cache cursor init
 - 若你的 `vue-demo/package.json` 已配置 `figma-to-code-pipeline` 为本地源码依赖（推荐 `file:../figma-to-code-pipeline`，与父工作区目录名一致），则不需要安装 `@latest`。
 - 本地源码联调时建议用 `npm install` 刷新依赖即可；仅在需要“验证发布包”时再用 `npm pack`/tgz 或 `@latest`。
 
-### 3.2 准备批量文件（推荐）
+### 3.2 准备批量文件（推荐，v2）
 
-目标项目根目录创建：`figma-e2e-batch.json`
+目标项目根目录创建：`figma-e2e-batch.json`（v2）
 
 ```json
-[
-  {
-    "fileKey": "<fileKey>",
-    "nodeId": "<nodeId>",
-    "target": "./src/pages/main/components/<YourComponent>/index.vue",
-    "minScore": 85,
-    "maxWarnings": 10,
-    "maxDiffs": 10
-  }
-]
+{
+  "version": 2,
+  "cases": [
+    {
+      "id": "case-vue-<nodeId>",
+      "designRef": { "fileKey": "<fileKey>", "nodeId": "<nodeId>" },
+      "target": { "kind": "vue", "entry": "./src/pages/main/components/<YourComponent>/index.vue" },
+      "mount": { "mountPage": "src/pages/main/index.vue", "mode": "inject" },
+      "audit": { "mode": "web-strict" },
+      "limits": { "minScore": 85, "maxWarnings": 10, "maxDiffs": 10 },
+      "policy": { "allowPrimitives": [] }
+    }
+  ]
+}
 ```
 
-`target` 为**相对于目标项目根目录**的路径（与 `figma-e2e-batch.json` 所在目录一致），便于克隆到任意盘符。
+`target.entry` 与 `mount.mountPage` 都为**相对于目标项目根目录**的路径（与 `figma-e2e-batch.json` 所在目录一致），便于克隆到任意盘符。
 
-补充：推荐用工具链脚本维护 batch（统一命名规则，减少手工编辑）：
+补充：推荐用工具链脚本维护 batch（统一命名规则，减少手工编辑；v2 会写入 `designRef/target/mount/audit/limits`）：
 
 ```bash
 # 在目标项目根目录执行
 # 1) 添加/更新一个 case（默认会用严格 PascalCase 命名组件目录）
-node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" --fileKey=<fileKey>
+node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" --fileKey=<fileKey> --kind=vue
 
 # 2) 也可以显式指定语义化组件名（必须严格 PascalCase）
-node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<...>" --fileKey=<fileKey> --component=AudioSettingsPanel
+node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<...>" --fileKey=<fileKey> --component=AudioSettingsPanel --kind=vue
 
 # 2.1) 若你的项目目录结构不是 ./src/pages/main/components，可指定 target-root（或用环境变量）
-node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<...>" --fileKey=<fileKey> --target-root=./src/ui/components
+node ./node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<...>" --fileKey=<fileKey> --target-root=./src/ui/components --kind=vue
 # 或：设置环境变量 FIGMA_UI_BATCH_TARGET_ROOT=./src/ui/components
 
 # 2.2) 工程化配置（推荐）：在项目根目录新增 figma-ui-batch.config.json

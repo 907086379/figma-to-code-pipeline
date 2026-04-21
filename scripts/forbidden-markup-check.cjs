@@ -8,6 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 
@@ -169,21 +170,19 @@ function mergeConstraints(base, override) {
 function readBatchTargets(batchPath) {
   const abs = path.isAbsolute(batchPath) ? batchPath : path.join(ROOT, batchPath);
   if (!fs.existsSync(abs)) throw new Error(`batch file missing: ${abs}`);
-  const payload = JSON.parse(fs.readFileSync(abs, "utf8"));
-  if (!Array.isArray(payload) || payload.length === 0) {
-    throw new Error("batch file must contain at least one item");
-  }
-  return payload.map((item, idx) => {
-    const target = String(item && item.target ? item.target : "").trim();
-    if (!target) throw new Error(`case[${idx}] missing target`);
+  const batch = readBatchV2(abs, ROOT);
+  return batch.cases
+    .filter((item) => String(item && item.target && item.target.kind ? item.target.kind : "").trim() !== "html")
+    .map((item) => {
+    const target = String(item && item.target ? item.target.entry : "").trim();
+    if (!target) throw new Error(`case[${item.index}] missing target.entry`);
     const absTarget = path.isAbsolute(target) ? path.normalize(target) : path.join(ROOT, target);
-    const constraintsOverride = item && item.constraints ? item.constraints : null;
-    const policyOverride = item && item.policy ? item.policy : null;
-    const fileKey = String(item && item.fileKey ? item.fileKey : "").trim();
-    const nodeId = String(item && item.nodeId ? item.nodeId : "").trim();
-    const cacheKey =
-      String(item && item.cacheKey ? item.cacheKey : "").trim() || (fileKey && nodeId ? `${fileKey}#${nodeId}` : "");
-    return { absTarget, constraintsOverride, policyOverride, cacheKey };
+    return {
+      absTarget,
+      constraintsOverride: item && item.constraints ? item.constraints : null,
+      policyOverride: item && item.policy ? item.policy : null,
+      cacheKey: String(item && item.cacheKey ? item.cacheKey : "").trim(),
+    };
   });
 }
 

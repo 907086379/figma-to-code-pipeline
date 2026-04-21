@@ -46,6 +46,8 @@ function parseArgs(argv) {
   const options = {
     cacheKey: "",
     target: "",
+    targetKind: "",
+    auditMode: "",
     contract: "",
     minScore: 90,
     maxWarnings: 0,
@@ -63,6 +65,14 @@ function parseArgs(argv) {
     }
     if (arg.startsWith("--target=")) {
       options.target = arg.split("=").slice(1).join("=").trim();
+      return;
+    }
+    if (arg.startsWith("--target-kind=")) {
+      options.targetKind = arg.split("=").slice(1).join("=").trim();
+      return;
+    }
+    if (arg.startsWith("--audit-mode=")) {
+      options.auditMode = arg.split("=").slice(1).join("=").trim();
       return;
     }
     if (arg.startsWith("--contract=")) {
@@ -196,22 +206,28 @@ function run() {
   const target = options.target ? resolveMaybeAbsolutePath(options.target) : "";
   const contract = options.contract ? resolveMaybeAbsolutePath(options.contract) : "";
   const reportPaths = buildReportPaths(options);
+  const targetKind =
+    String(options.targetKind || "").trim() ||
+    (target && String(target).toLowerCase().endsWith(".html") ? "html" : "");
+  const auditMode = String(options.auditMode || "").trim() || (targetKind === "html" ? "html-partial" : "web-strict");
 
   if (!options.reportsOnly) {
-    // Project icon registry rewrite (optional, but must happen BEFORE forbidden gate):
-    // If target project provides ui-icon-registry.json, rewrite icon-like <img> to icon classes.
-    if (options.cacheKey && target) {
-      const iconRewriteScript = path.join(SCRIPT_DIR, "ui-icon-rewrite.js");
-      runOrExit(`node "${iconRewriteScript}" --cacheKey=${options.cacheKey} --target="${target}"`);
-    }
+    const isHtml = targetKind === "html" || auditMode === "html-partial";
+    if (!isHtml) {
+      // Project icon registry rewrite（可选，但必须发生在 forbidden gate 之前）：
+      // 若项目提供 ui-icon-registry.json，把 icon-like <img> 重写为 icon class。
+      if (options.cacheKey && target) {
+        const iconRewriteScript = path.join(SCRIPT_DIR, "ui-icon-rewrite.js");
+        runOrExit(`node "${iconRewriteScript}" --cacheKey=${options.cacheKey} --target="${target}"`);
+      }
 
-    // Enforce toolchain forbidden markup gate before running audit.
-    // This keeps cross-project workflows consistent with batch acceptance.
-    if (target) {
-      const forbiddenScript = path.join(SCRIPT_DIR, "forbidden-markup-check.cjs");
-      const ckArg = options.cacheKey ? ` --cacheKey=${options.cacheKey}` : "";
-      if (!runOrExit(`node "${forbiddenScript}" --file="${target}"${ckArg}`.trim())) {
-        process.exit(FAIL_EXIT_CODE);
+      // 工具链 forbidden gate：Web 组件才执行（HTML 审计不适用）。
+      if (target) {
+        const forbiddenScript = path.join(SCRIPT_DIR, "forbidden-markup-check.cjs");
+        const ckArg = options.cacheKey ? ` --cacheKey=${options.cacheKey}` : "";
+        if (!runOrExit(`node "${forbiddenScript}" --file="${target}"${ckArg}`.trim())) {
+          process.exit(FAIL_EXIT_CODE);
+        }
       }
     }
 
@@ -227,21 +243,21 @@ function run() {
       process.exit(FAIL_EXIT_CODE);
     }
 
-    // Generate icon inset geometry for the target component folder (cross-project parity with accept:batch).
-    // If raw.json is present, this MUST succeed to avoid drifting artifacts.
-    if (options.cacheKey && target) {
-      const rawAbs = rawJsonPathFromCacheKey(options.cacheKey);
-      if (rawAbs && fs.existsSync(rawAbs)) {
-        const outDir = path.dirname(target);
-        const genScript = path.join(SCRIPT_DIR, "generate-icon-insets.cjs");
-        const ck = `${String(options.cacheKey).split("#")[0]}#${normalizeNodeId(String(options.cacheKey).split("#")[1])}`;
-        if (!runOrExit(`node "${genScript}" --raw="${rawAbs}" --out-dir="${outDir}" --cacheKey="${ck}"`.trim())) {
-          process.exit(FAIL_EXIT_CODE);
+    // icon insets：仅 Web 组件适用
+    if (!(targetKind === "html" || auditMode === "html-partial")) {
+      // 若 raw.json 存在，必须生成（避免 artifacts 漂移）
+      if (options.cacheKey && target) {
+        const rawAbs = rawJsonPathFromCacheKey(options.cacheKey);
+        if (rawAbs && fs.existsSync(rawAbs)) {
+          const outDir = path.dirname(target);
+          const genScript = path.join(SCRIPT_DIR, "generate-icon-insets.cjs");
+          const ck = `${String(options.cacheKey).split("#")[0]}#${normalizeNodeId(String(options.cacheKey).split("#")[1])}`;
+          if (!runOrExit(`node "${genScript}" --raw="${rawAbs}" --out-dir="${outDir}" --cacheKey="${ck}"`.trim())) {
+            process.exit(FAIL_EXIT_CODE);
+          }
+        } else {
+          console.warn(`[ui-auto-acceptance] icon insets skipped（raw.json 缺失）：${rawAbs}`);
         }
-      } else {
-        // Best-effort: preflight/audit may still pass without iconMetrics.
-        // Keep output minimal; do not fail the whole workflow for legacy cache items.
-        console.warn(`[ui-auto-acceptance] icon insets skipped (raw.json missing): ${rawAbs}`);
       }
     }
 
@@ -257,6 +273,7 @@ function run() {
     }
     auditArgs.push(`--min-score=${options.minScore}`);
     const auditScript = path.join(SCRIPT_DIR, "ui-1to1-audit.js");
+    auditArgs.push(`--mode=${auditMode}`);
     if (!runOrExit(`node "${auditScript}" ${auditArgs.join(" ")}`.trim())) {
       process.exit(FAIL_EXIT_CODE);
     }

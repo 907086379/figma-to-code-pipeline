@@ -29,6 +29,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const INDEX_ABS = path.join(ROOT, "figma-cache", "index.json");
@@ -65,13 +66,6 @@ function normalizeCacheKey(input) {
   const parts = value.split("#");
   if (parts.length !== 2) return value;
   return `${parts[0]}#${normalizeNodeId(parts[1])}`;
-}
-
-function cacheKeyFromItem(item) {
-  const fileKey = String(item && item.fileKey ? item.fileKey : "").trim();
-  const nodeId = String(item && item.nodeId ? item.nodeId : "").trim();
-  if (!fileKey || !nodeId) return "";
-  return `${fileKey}#${normalizeNodeId(nodeId)}`;
 }
 
 function parseArgs(argv) {
@@ -193,18 +187,14 @@ function main() {
     console.error(`[auto-link-related-from-batch] batch not found: ${batchAbs}`);
     process.exit(2);
   }
-  const batch = JSON.parse(fs.readFileSync(batchAbs, "utf8"));
-  if (!Array.isArray(batch) || batch.length === 0) {
-    console.error("[auto-link-related-from-batch] batch must be a non-empty array");
-    process.exit(2);
-  }
+  const batch = readBatchV2(batchAbs, ROOT);
 
   const flow = ensureFlow(index, args.flowId);
   let links = 0;
   const suggestions = [];
 
-  batch.forEach((b) => {
-    const primary = normalizeCacheKey(String(b && (b.cacheKey || cacheKeyFromItem(b)) || ""));
+  batch.cases.forEach((b) => {
+    const primary = normalizeCacheKey(String(b && b.cacheKey ? b.cacheKey : ""));
     if (!primary) return;
     const primaryItem = index.items[primary];
     if (!primaryItem || !primaryItem.paths || !primaryItem.paths.raw) return;

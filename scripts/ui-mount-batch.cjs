@@ -2,22 +2,24 @@
 "use strict";
 
 /**
- * Mount a batch target component into a project page (Vue SFC) for runtime verification.
+ * 把 batch(v2) 的目标产物挂载/注入到页面（用于运行时验证）。
  *
- * Reads:
- * - figma-e2e-batch.json (default)
- * - figma-ui-batch.config.json (optional): uiBatch.mountPage
+ * 读取：
+ * - figma-e2e-batch.json（默认；v2）
+ * - figma-ui-batch.config.json（可选）：uiBatch.mountPage（当 case 未显式配置 mount.mountPage 时兜底）
  *
- * Usage:
+ * 用法：
  *   node scripts/ui-mount-batch.cjs --batch=./figma-e2e-batch.json [--case=0] [--all] [--mount-page=src/pages/main/index.vue] [--create-stub-on-miss]
  *
- * Supports:
- * - Vue SFC mountPage (*.vue): inject into <template> + <script setup>
- * - React mountPage (*.tsx|*.jsx): inject import + JSX usage
+ * 支持：
+ * - Vue mountPage（*.vue）：注入到 <template> 与 <script setup>
+ * - React mountPage（*.tsx|*.jsx）：注入 import + JSX 使用
+ * - HTML mountPage（*.html）：按 marker 容器注入 HTML 片段（幂等替换）
  */
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_BATCH = "figma-e2e-batch.json";
@@ -127,6 +129,14 @@ function writeStubIfMissing(targetAbs, componentName, cacheKeyHint) {
           "</script>",
           "",
         ].join("\n")
+      : ext === ".html"
+      ? [
+          `<!-- generated stub: ${cacheKeyHint || componentName} -->`,
+          `<div data-generated="stub"${cacheKeyHint ? ` data-cache-key=${JSON.stringify(cacheKeyHint)}` : ""}>`,
+          `  ${componentName} (stub)`,
+          "</div>",
+          "",
+        ].join("\n")
       : [
           `export default function ${componentName}() {`,
           "  return (",
@@ -234,7 +244,7 @@ function mountComponentInReactJsx(source, componentName) {
   }
 
   // Heuristic A: inside first `return (` JSX block.
-  const returnRe = /return\s*\(\s*([\s\S]*?)\);\s*/m;
+  const returnRe = /return\s*\(\s*([\s\S]*?)\)\s*;?\s*/m;
   const returnM = text.match(returnRe);
   if (returnM) {
     const body = String(returnM[1] || "");
@@ -278,13 +288,84 @@ function applyMountToPage(mountPageAbs, mounts) {
       next = mountComponentInReactJsx(next, componentName);
     });
   } else {
-    console.error(`[ui-mount-batch] unsupported mount page extension: ${ext}`);
+    console.error(`[ui-mount-batch] 不支持的 mountPage 后缀：${ext}`);
     process.exit(2);
   }
 
   if (next !== before) {
     fs.writeFileSync(mountPageAbs, next, "utf8");
   }
+  return { changed: next !== before };
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ensureHtmlMarkerContainer(html, marker) {
+  const m = String(marker || "").trim();
+  if (!m) return { html, ensured: false };
+  const attrRe = new RegExp(`data-figma-mount\\s*=\\s*["']${escapeRegExp(m)}["']`, "i");
+  if (attrRe.test(html)) return { html, ensured: false };
+  const insert = `\n  <div data-figma-mount="${m}"></div>\n`;
+  if (/<\/body>/i.test(html)) {
+    return { html: html.replace(/<\/body>/i, `${insert}</body>`), ensured: true };
+  }
+  return { html: `${html.replace(/\s*$/, "")}${insert}`, ensured: true };
+}
+
+function injectHtmlIntoMarkerContainer(html, marker, injected) {
+  const m = String(marker || "").trim();
+  if (!m) return html;
+
+  const start = `<!-- figma-mount:${m}:start -->`;
+  const end = `<!-- figma-mount:${m}:end -->`;
+  const payload = `\n    ${start}\n${String(injected || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => `    ${l}`)
+    .join("\n")}\n    ${end}\n  `;
+
+  // 1) 优先替换已有 start/end 区域（幂等）
+  const regionRe = new RegExp(
+    `(<!--\\s*figma-mount:${escapeRegExp(m)}:start\\s*-->)[\\s\\S]*?(<!--\\s*figma-mount:${escapeRegExp(m)}:end\\s*-->)`,
+    "i"
+  );
+  if (regionRe.test(html)) {
+    return html.replace(regionRe, `${start}${payload.replace(start, "").replace(end, "")}${end}`);
+  }
+
+  // 2) 替换容器 innerHTML
+  const containerRe = new RegExp(
+    `(<([a-zA-Z][\\w-]*)([^>]*\\sdata-figma-mount\\s*=\\s*["']${escapeRegExp(m)}["'][^>]*)>)([\\s\\S]*?)(<\\/\\2>)`,
+    "i"
+  );
+  if (containerRe.test(html)) {
+    return html.replace(containerRe, (full, open, tag, attrs, inner, close) => `${open}${payload}${close}`);
+  }
+
+  // 3) 处理自闭合容器：<div ... />
+  const selfCloseRe = new RegExp(
+    `<([a-zA-Z][\\w-]*)([^>]*\\sdata-figma-mount\\s*=\\s*["']${escapeRegExp(m)}["'][^>]*?)\\s*\\/\\s*>`,
+    "i"
+  );
+  if (selfCloseRe.test(html)) {
+    return html.replace(selfCloseRe, (full, tag, attrs) => `<${tag}${attrs}>${payload}</${tag}>`);
+  }
+
+  // 兜底：不做破坏性替换
+  return html;
+}
+
+function applyHtmlInjectMount(mountPageAbs, mounts) {
+  const before = fs.readFileSync(mountPageAbs, "utf8");
+  let next = before;
+  mounts.forEach((m) => {
+    const ensured = ensureHtmlMarkerContainer(next, m.marker);
+    next = ensured.html;
+    next = injectHtmlIntoMarkerContainer(next, m.marker, m.injectedHtml);
+  });
+  if (next !== before) fs.writeFileSync(mountPageAbs, next, "utf8");
   return { changed: next !== before };
 }
 
@@ -296,71 +377,94 @@ function main() {
     process.exit(2);
   }
 
-  const payload = readJsonOrThrow(batchAbs);
-  if (!Array.isArray(payload) || payload.length === 0) {
-    console.error("[ui-mount-batch] batch must be a non-empty array");
-    process.exit(2);
-  }
-  const cases = args.all ? payload : [payload[args.caseIndex]];
+  const batch = readBatchV2(batchAbs, ROOT);
+  const cases = args.all ? batch.cases : [batch.cases[args.caseIndex]];
   if (!cases.length || cases.some((c) => !c)) {
-    console.error(`[ui-mount-batch] case index out of range: ${args.caseIndex}`);
+    console.error(`[ui-mount-batch] case index 越界：${args.caseIndex}`);
     process.exit(2);
   }
 
   const { config } = readUiBatchConfig();
-  const mountPageRel =
-    String(args.mountPage || "").trim() ||
-    String(config && config.mountPage ? config.mountPage : "").trim() ||
-    "src/pages/main/index.vue";
-  const mountPageAbs = resolveAbs(mountPageRel);
-  if (!mountPageAbs || !fs.existsSync(mountPageAbs)) {
-    console.error(`[ui-mount-batch] mount page not found: ${mountPageAbs}`);
-    process.exit(2);
+  const mountPageRelOverride = String(args.mountPage || "").trim();
+  const mountPageRelFallback =
+    String(config && config.mountPage ? config.mountPage : "").trim() || "src/pages/main/index.vue";
+
+  function mountPageRelForCase(item) {
+    if (mountPageRelOverride) return mountPageRelOverride;
+    const fromCase = item && item.mount && item.mount.mountPage ? String(item.mount.mountPage).trim() : "";
+    return fromCase || mountPageRelFallback;
   }
 
-  const mounts = [];
-  const stubsCreated = [];
-  cases.forEach((item, idx) => {
-    const targetRel = String(item && item.target ? item.target : "").trim();
-    if (!targetRel) {
-      console.error(`[ui-mount-batch] case[${args.all ? idx : args.caseIndex}] missing target`);
-      process.exit(2);
-    }
-    const targetAbs = resolveAbs(targetRel);
-    if (!targetAbs) {
-      console.error(`[ui-mount-batch] invalid target path: ${targetRel}`);
-      process.exit(2);
-    }
-    const componentName = inferComponentNameFromTarget(targetRel);
-    if (!componentName) {
-      console.error(`[ui-mount-batch] failed to infer component name from target: ${targetRel}`);
-      process.exit(2);
-    }
-    const cacheKeyHint =
-      item && item.fileKey && item.nodeId ? `${String(item.fileKey).trim()}#${String(item.nodeId).trim()}` : "";
-    const stub = args.createStubOnMiss
-      ? writeStubIfMissing(targetAbs, componentName, cacheKeyHint)
-      : { created: false };
-    if (!fs.existsSync(targetAbs)) {
-      console.error(`[ui-mount-batch] target path does not exist: ${targetAbs}`);
-      console.error("Hint: pass --create-stub-on-miss (default) or generate the target component first.");
-      process.exit(2);
-    }
-    if (stub.created) stubsCreated.push(componentName);
-    mounts.push({
-      componentName,
-      targetRel,
-      targetAbs,
-      importPath: computeImportPath(mountPageAbs, targetAbs),
-    });
+  const groups = new Map(); // mountPageRel -> case[]
+  cases.forEach((c) => {
+    const rel = mountPageRelForCase(c);
+    if (!groups.has(rel)) groups.set(rel, []);
+    groups.get(rel).push(c);
   });
 
-  applyMountToPage(mountPageAbs, mounts);
+  let totalMounted = 0;
+  const stubsCreated = [];
+  groups.forEach((caseList, mountPageRel) => {
+    const mountPageAbs = resolveAbs(mountPageRel);
+    if (!mountPageAbs || !fs.existsSync(mountPageAbs)) {
+      console.error(`[ui-mount-batch] mount page not found: ${mountPageAbs}`);
+      process.exit(2);
+    }
+    const mounts = [];
+    caseList.forEach((item) => {
+      const targetRel = String(item && item.target && item.target.entry ? item.target.entry : "").trim();
+      if (!targetRel) {
+        console.error(`[ui-mount-batch] case[${item.index}] 缺失 target.entry`);
+        process.exit(2);
+      }
+      const targetAbs = resolveAbs(targetRel);
+      if (!targetAbs) {
+        console.error(`[ui-mount-batch] invalid target path: ${targetRel}`);
+        process.exit(2);
+      }
+      const componentName = inferComponentNameFromTarget(targetRel) || String(item.id || `Case${item.index}`);
+      const cacheKeyHint = String(item && item.cacheKey ? item.cacheKey : "").trim();
+      const stub = args.createStubOnMiss
+        ? writeStubIfMissing(targetAbs, componentName, cacheKeyHint)
+        : { created: false };
+      if (!fs.existsSync(targetAbs)) {
+        console.error(`[ui-mount-batch] target path does not exist: ${targetAbs}`);
+        console.error("Hint: pass --create-stub-on-miss (default) or generate the target component first.");
+        process.exit(2);
+      }
+      if (stub.created) stubsCreated.push(componentName);
+
+      const targetKind = String(item && item.target ? item.target.kind : "").trim();
+      if (String(mountPageAbs).toLowerCase().endsWith(".html") || targetKind === "html") {
+        mounts.push({
+          componentName,
+          targetRel,
+          targetAbs,
+          marker: String(item && item.mount && item.mount.marker ? item.mount.marker : `case-${item.index}`).trim(),
+          injectedHtml: fs.readFileSync(targetAbs, "utf8"),
+        });
+      } else {
+        mounts.push({
+          componentName,
+          targetRel,
+          targetAbs,
+          importPath: computeImportPath(mountPageAbs, targetAbs),
+        });
+      }
+    });
+
+    if (String(mountPageAbs).toLowerCase().endsWith(".html")) {
+      applyHtmlInjectMount(mountPageAbs, mounts);
+    } else {
+      applyMountToPage(mountPageAbs, mounts);
+    }
+    totalMounted += mounts.length;
+  });
 
   console.log("[ui-mount-batch] ok");
-  console.log(`- mountPage: ${normalizeSlash(mountPageRel)}`);
+  console.log(`- mountPage: ${Array.from(groups.keys()).map(normalizeSlash).join(", ")}`);
   console.log(`- mode: ${args.all ? "all" : `case=${args.caseIndex}`}`);
-  console.log(`- mounted: ${mounts.length}`);
+  console.log(`- mounted: ${totalMounted}`);
   if (stubsCreated.length) {
     console.log(`- stub: created (${stubsCreated.length})`);
   }

@@ -2,21 +2,21 @@
 "use strict";
 
 /**
- * Upsert one case into figma-e2e-batch.json with a strict PascalCase default component name.
+ * 把一个 case 写入/更新到 figma-e2e-batch.json（v2）。
  *
- * Why this exists in toolchain:
- * - Batch config is part of the toolchain workflow (UI e2e automation).
- * - Default naming must be consistent across target projects.
+ * 为什么放在工具链：
+ * - batch 是 UI 自动化闭环的一部分，命名/路径模板必须稳定一致
  *
- * Default naming:
- * - nodeId 9277-28654 -> FigmaNode9277x28654 (strict PascalCase, traceable to node-id)
+ * 默认命名（无业务语义名时）：
+ * - nodeId 9277-28654 -> FigmaNode9277x28654（严格 PascalCase 且可追溯 node-id）
  *
- * Usage:
- *   node scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" [--batch=figma-e2e-batch.json] [--fileKey=...] [--target=...] [--target-root=...] [--component=...]
+ * 用法：
+ *   node scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" [--batch=figma-e2e-batch.json] [--fileKey=...] [--target=...] [--target-root=...] [--component=...] [--kind=vue|react|html]
  */
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2, writeBatchV2, normalizeNodeIdToBatch } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_BATCH = "figma-e2e-batch.json";
@@ -100,6 +100,7 @@ function parseArgs(argv) {
     target: "",
     targetRoot: "",
     component: "",
+    kind: "vue",
     minScore: 85,
     maxWarnings: 10,
     maxDiffs: 10,
@@ -116,6 +117,7 @@ function parseArgs(argv) {
     else if (arg.startsWith("--target=")) out.target = arg.split("=").slice(1).join("=").trim();
     else if (arg.startsWith("--target-root=")) out.targetRoot = arg.split("=").slice(1).join("=").trim();
     else if (arg.startsWith("--component=")) out.component = arg.split("=").slice(1).join("=").trim();
+    else if (arg.startsWith("--kind=")) out.kind = arg.split("=").slice(1).join("=").trim();
     else if (arg.startsWith("--minScore=")) out.minScore = Number(arg.split("=").slice(1).join("=").trim());
     else if (arg.startsWith("--maxWarnings="))
       out.maxWarnings = Number(arg.split("=").slice(1).join("=").trim());
@@ -192,15 +194,29 @@ function resolveTarget({ target, component, nodeId, targetRoot }) {
   return rendered;
 }
 
-function upsertCase(batchPayload, item) {
-  const next = Array.isArray(batchPayload) ? [...batchPayload] : [];
-  const idx = next.findIndex((x) => x && x.fileKey === item.fileKey && x.nodeId === item.nodeId);
+function emptyBatchV2() {
+  return { version: 2, cases: [] };
+}
+
+function upsertCaseV2(batchPayload, nextCase) {
+  const base =
+    batchPayload && typeof batchPayload === "object" && !Array.isArray(batchPayload) ? batchPayload : emptyBatchV2();
+  const cases = Array.isArray(base.cases) ? [...base.cases] : [];
+  const fk = String(nextCase.designRef.fileKey || "").trim();
+  const nid = String(nextCase.designRef.nodeId || "").trim();
+  const idx = cases.findIndex(
+    (x) =>
+      x &&
+      x.designRef &&
+      String(x.designRef.fileKey || "").trim() === fk &&
+      String(x.designRef.nodeId || "").trim() === nid
+  );
   if (idx >= 0) {
-    next[idx] = { ...next[idx], ...item };
-    return { payload: next, action: "updated" };
+    cases[idx] = { ...cases[idx], ...nextCase };
+    return { payload: { ...base, version: 2, cases }, action: "updated" };
   }
-  next.push(item);
-  return { payload: next, action: "added" };
+  cases.push(nextCase);
+  return { payload: { ...base, version: 2, cases }, action: "added" };
 }
 
 function main() {
@@ -208,26 +224,26 @@ function main() {
   if (!args.input) {
     console.error(
       [
-        "usage:",
-        '  node scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" [--fileKey=...] [--target=...] [--target-root=...] [--component=...]',
+        "用法：",
+        '  node scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" [--fileKey=...] [--target=...] [--target-root=...] [--component=...] [--kind=vue|react|html]',
         "",
-        "component naming:",
-        "- default is strict PascalCase and traceable to node-id, e.g. 9277-28654 -> FigmaNode9277x28654",
-        "- if you pass --component, it must be strict PascalCase (A-Z then alnum only).",
+        "组件命名：",
+        "- 默认严格 PascalCase 且可追溯 node-id，例如 9277-28654 -> FigmaNode9277x28654",
+        "- 若传 --component，必须严格 PascalCase（A-Z 开头，后续仅字母数字）。",
         "",
-        "target path:",
-        "- by default writes to ./src/pages/main/components/<Component>/index.vue",
-        "- override with --target (full path), or set --target-root (directory root)",
-        "- you can also set env FIGMA_UI_BATCH_TARGET_ROOT to avoid repeating --target-root",
-        "- for engineering setups, create figma-ui-batch.config.json in project root:",
+        "target.entry 路径：",
+        "- 默认写入 ./src/pages/main/components/<Component>/index.vue（kind=vue）",
+        "- 你可以用 --target 显式指定 entry，或用 --target-root 改根目录",
+        "- 可设置环境变量 FIGMA_UI_BATCH_TARGET_ROOT 避免重复传 --target-root",
+        "- 工程化配置：在项目根新增 figma-ui-batch.config.json：",
         '  { "uiBatch": { "targetRoot": "./src/ui/components", "targetTemplate": "{targetRoot}/{component}/index.vue" } }',
-        "- env override: FIGMA_UI_BATCH_TARGET_TEMPLATE",
+        "- 环境变量覆盖模板：FIGMA_UI_BATCH_TARGET_TEMPLATE",
         "",
-        "examples:",
-        '  node scripts/batch-add.cjs "https://www.figma.com/design/<fileKey>/...?node-id=9278-30676"',
-        '  node scripts/batch-add.cjs "53hw0wDvgOzH14DXSsnEmE#9278:30676"',
-        '  node scripts/batch-add.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE',
-        '  node scripts/batch-add.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE --target-root=./src/ui/components',
+        "示例：",
+        '  node scripts/batch-add.cjs "https://www.figma.com/design/<fileKey>/...?node-id=9278-30676" --kind=vue',
+        '  node scripts/batch-add.cjs "53hw0wDvgOzH14DXSsnEmE#9278:30676" --kind=vue',
+        '  node scripts/batch-add.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE --kind=vue',
+        '  node scripts/batch-add.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE --target-root=./src/ui/components --kind=vue',
       ].join("\n")
     );
     process.exit(2);
@@ -261,6 +277,12 @@ function main() {
     process.exit(2);
   }
 
+  const kind = String(args.kind || "").trim() || "vue";
+  if (!["vue", "react", "html"].includes(kind)) {
+    console.error(`invalid --kind (must be vue|react|html). received: ${JSON.stringify(args.kind)}`);
+    process.exit(2);
+  }
+
   if (args.component && !isStrictPascalCase(args.component)) {
     console.error(
       [
@@ -278,23 +300,29 @@ function main() {
     nodeId,
     targetRoot: args.targetRoot,
   });
-  const item = {
-    fileKey,
-    nodeId: normalizeNodeIdForBatch(nodeId),
-    target,
-    minScore: Number.isFinite(Number(args.minScore)) ? Number(args.minScore) : 85,
-    maxWarnings: Number.isFinite(Number(args.maxWarnings)) ? Number(args.maxWarnings) : 10,
-    maxDiffs: Number.isFinite(Number(args.maxDiffs)) ? Number(args.maxDiffs) : 10,
+
+  const nodeIdBatch = normalizeNodeIdForBatch(nodeId);
+  const itemV2 = {
+    id: `${kind}-${fileKey}-${nodeIdBatch}`,
+    designRef: { fileKey, nodeId: nodeIdBatch },
+    target: { kind, entry: target, assets: [] },
+    audit: { mode: kind === "html" ? "html-partial" : "web-strict" },
+    limits: {
+      minScore: Number.isFinite(Number(args.minScore)) ? Number(args.minScore) : 85,
+      maxWarnings: Number.isFinite(Number(args.maxWarnings)) ? Number(args.maxWarnings) : 10,
+      maxDiffs: Number.isFinite(Number(args.maxDiffs)) ? Number(args.maxDiffs) : 10,
+    },
     policy: { allowPrimitives: [] },
   };
 
   const existing = readJsonIfExists(batchAbs);
-  const { payload, action } = upsertCase(existing, item);
-  writeJson(batchAbs, payload);
+  const { payload, action } = upsertCaseV2(existing, itemV2);
+  writeBatchV2(batchAbs, ROOT, payload);
 
-  const cacheKey = `${fileKey}#${normalizeNodeIdForCacheKey(item.nodeId)}`;
+  const cacheKey = `${fileKey}#${normalizeNodeIdForCacheKey(normalizeNodeIdToBatch(nodeIdBatch))}`;
   console.log(`[batch-add] ${action}: ${cacheKey}`);
-  console.log(`[batch-add] target: ${item.target}`);
+  console.log(`[batch-add] target.kind: ${kind}`);
+  console.log(`[batch-add] target.entry: ${itemV2.target.entry}`);
 }
 
 main();

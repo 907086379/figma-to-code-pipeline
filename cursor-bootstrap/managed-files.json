@@ -29,6 +29,10 @@
       "to": ".cursor/rules/06-commit-message-chinese-only.mdc"
     },
     {
+      "from": "rules/07-karpathy-coding-discipline.mdc",
+      "to": ".cursor/rules/07-karpathy-coding-discipline.mdc"
+    },
+    {
       "from": "rules/figma-local-cache-first.mdc",
       "to": ".cursor/rules/figma-local-cache-first.mdc"
     },
@@ -52,6 +56,7 @@
   "retiredFiles": [
     ".cursor/skills/ui-baseline-governance/SKILL.md",
     ".cursor/rules/04-command-execution-anti-regression.mdc",
-    ".cursor/rules/commit-conventions.mdc"
+    ".cursor/rules/commit-conventions.mdc",
+    ".cursor/rules/karpathy-guidelines.mdc"
   ]
 }

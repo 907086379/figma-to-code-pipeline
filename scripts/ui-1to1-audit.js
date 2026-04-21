@@ -15,6 +15,7 @@ const DEFAULT_REPORT_PATH = "figma-cache/reports/runtime/ui-1to1-report.json";
 const DEFAULT_MIN_SCORE = 85;
 const DEFAULT_RECIPES_DIR = "figma-cache/adapters/recipes";
 const FAIL_EXIT_CODE = 2;
+const DEFAULT_MODE = "web-strict";
 
 function parseBoolEnv(value, fallback) {
   if (value == null) return fallback;
@@ -64,6 +65,7 @@ function parseArgs(argv) {
   const options = {
     cacheKey: "",
     targetPath: "",
+    mode: DEFAULT_MODE, // web-strict | html-partial
     contractPath: DEFAULT_CONTRACT_PATH,
     reportPath: DEFAULT_REPORT_PATH,
     minScore: DEFAULT_MIN_SCORE,
@@ -79,6 +81,10 @@ function parseArgs(argv) {
     }
     if (arg.startsWith("--target=")) {
       options.targetPath = arg.split("=").slice(1).join("=").trim();
+      return;
+    }
+    if (arg.startsWith("--mode=")) {
+      options.mode = arg.split("=").slice(1).join("=").trim() || DEFAULT_MODE;
       return;
     }
     if (arg.startsWith("--contract=")) {
@@ -196,6 +202,7 @@ function scoreItem(params) {
   const blocking = [];
   const warnings = [];
   const diffs = [];
+  const skippedDimensions = [];
 
   if (!item) {
     blocking.push(`cache item not found: ${cacheKey}`);
@@ -212,6 +219,7 @@ function scoreItem(params) {
       blocking,
       warnings,
       diffs,
+      skippedDimensions,
     };
   }
 
@@ -222,7 +230,12 @@ function scoreItem(params) {
   const rawPath = paths.raw ? resolveMaybeAbsolutePath(paths.raw) : "";
   const entryReady = [metaPath, specPath, stateMapPath, rawPath].every((p) => !!p && fs.existsSync(p));
   if (!entryReady) {
-    blocking.push("entry files not complete");
+    // html-partial 允许最小集合缺失时尽量产出报告，不默认失败
+    if (String(options.mode) === "html-partial") {
+      warnings.push("缓存条目文件不完整（html-partial：不默认失败）");
+    } else {
+      blocking.push("entry files not complete");
+    }
   }
 
   const specText = readTextOrEmpty(specPath);
@@ -237,7 +250,11 @@ function scoreItem(params) {
       : {};
   const evidenceReady = completeness.every((k) => Array.isArray(evidence[k]) && evidence[k].length > 0);
   if (!evidenceReady) {
-    blocking.push("coverage evidence incomplete");
+    if (String(options.mode) === "html-partial") {
+      warnings.push("coverage evidence 不完整（html-partial：不默认失败）");
+    } else {
+      blocking.push("coverage evidence incomplete");
+    }
   }
 
   const variableDefsJson = readVariableDefsFromManifest(metaPath);
@@ -301,12 +318,12 @@ function scoreItem(params) {
 
   const hasTargetCode = !!targetCode;
   if (!hasTargetCode) {
-    warnings.push("target component path not provided; code-level comparison skipped");
+    warnings.push("target 代码为空；将跳过 code-level 对照");
   }
 
-  const textCodeHits = hasTargetCode
-    ? textFacts.filter((fact) => targetCode.includes(fact)).length
-    : textFacts.length;
+  const isHtmlPartial = String(options.mode) === "html-partial";
+
+  const textCodeHits = hasTargetCode ? textFacts.filter((fact) => effectiveTargetCode.includes(fact)).length : textFacts.length;
   const tokenCodeHits = hasTargetCode
     ? tokenFacts.filter((fact) =>
         effectiveTargetCode.toUpperCase().includes(String(normalizeHexColor(fact.value || "")).toUpperCase())
@@ -316,18 +333,31 @@ function scoreItem(params) {
     ? statesInCache.filter((state) => effectiveTargetCode.toLowerCase().includes(state)).length
     : statesInCache.length;
 
-  const layoutScore = entryReady ? 100 : 20;
+  const layoutScore = isHtmlPartial ? null : entryReady ? 100 : 20;
   const textScore = clampScore(100 * (textFacts.length ? textCodeHits / textFacts.length : 1));
-  const tokenScore = clampScore(100 * tokenCoverage * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1));
-  const stateScore = clampScore(100 * stateCoverage * (statesInCache.length ? stateCodeHits / statesInCache.length : 1));
-  const interactionScore = hasTodo ? 70 : normalizedFacts.dimensions.interactionReady ? 100 : 80;
+  const tokenScore = isHtmlPartial
+    ? clampScore(100 * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1))
+    : clampScore(100 * tokenCoverage * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1));
+  const stateScore = isHtmlPartial
+    ? null
+    : clampScore(100 * stateCoverage * (statesInCache.length ? stateCodeHits / statesInCache.length : 1));
+  const interactionScore = isHtmlPartial ? null : hasTodo ? 70 : normalizedFacts.dimensions.interactionReady ? 100 : 80;
 
-  let totalScore = clampScore(average([layoutScore, textScore, tokenScore, stateScore, interactionScore]));
-  if (!hasTargetCode) {
-    // Baseline mode: without target code, keep gate usable while surfacing warnings/diffs.
-    // Strict comparison should pass --target and/or a higher --min-score.
-    if (!blocking.length) {
-      totalScore = Math.max(totalScore, 90);
+  if (isHtmlPartial) {
+    skippedDimensions.push("layout", "states", "interactions", "accessibility");
+  }
+
+  let totalScore = 0;
+  if (isHtmlPartial) {
+    const totalParts = [textScore, tokenScore].filter((n) => Number.isFinite(Number(n)));
+    totalScore = clampScore(average(totalParts.length ? totalParts : [0]));
+  } else {
+    totalScore = clampScore(average([layoutScore, textScore, tokenScore, stateScore, interactionScore]));
+    if (!hasTargetCode) {
+      // 兼容“未提供 target code”的基线模式：在不阻塞的前提下，给一个可用的分数下限。
+      if (!blocking.length) {
+        totalScore = Math.max(totalScore, 90);
+      }
     }
   }
 
@@ -345,6 +375,7 @@ function scoreItem(params) {
     warnings,
     diffs,
     matchedRecipes,
+    skippedDimensions,
   };
 }
 
@@ -357,6 +388,10 @@ function run() {
       : options.minScore;
   if (options.unknownArgs.length) {
     console.error(`Unknown args: ${options.unknownArgs.join(", ")}`);
+    process.exit(FAIL_EXIT_CODE);
+  }
+  if (!["web-strict", "html-partial"].includes(String(options.mode))) {
+    console.error(`ui-1to1-audit failed: --mode 仅支持 web-strict/html-partial，实际：${JSON.stringify(options.mode)}`);
     process.exit(FAIL_EXIT_CODE);
   }
 
@@ -396,7 +431,11 @@ function run() {
     blocking.push("index missing or invalid");
   }
   if (!contract || typeof contract !== "object") {
-    blocking.push("contract missing or invalid");
+    if (String(options.mode) === "html-partial") {
+      // html-partial 不依赖 contract（仅用 cache facts vs HTML 文本对照）
+    } else {
+      blocking.push("contract missing or invalid");
+    }
   }
   itemReports.forEach((item) => item.blocking.forEach((msg) => blocking.push(`${item.cacheKey}: ${msg}`)));
 
@@ -415,11 +454,11 @@ function run() {
       checkedItems: itemReports.length,
       score: {
         total: totalScore,
-        layout: clampScore(average(itemReports.map((item) => item.score.layout))),
+        layout: clampScore(average(itemReports.map((item) => Number(item.score.layout || 0)))),
         text: clampScore(average(itemReports.map((item) => item.score.text))),
         token: clampScore(average(itemReports.map((item) => item.score.token))),
-        state: clampScore(average(itemReports.map((item) => item.score.state))),
-        interaction: clampScore(average(itemReports.map((item) => item.score.interaction))),
+        state: clampScore(average(itemReports.map((item) => Number(item.score.state || 0)))),
+        interaction: clampScore(average(itemReports.map((item) => Number(item.score.interaction || 0)))),
       },
       blockingCount: blocking.length,
       warningCount: warnings.length,
@@ -429,10 +468,13 @@ function run() {
       recipesTotal: recipes.length,
       recipesMatchedItems: itemReports.filter((item) => Array.isArray(item.matchedRecipes) && item.matchedRecipes.length > 0)
         .length,
+      auditMode: options.mode,
+      skippedDimensions: Array.from(new Set(itemReports.flatMap((x) => x.skippedDimensions || []))).filter(Boolean),
     },
     options: {
       cacheKey: options.cacheKey || null,
       targetPath: targetPath ? normalizeSlash(targetPath) : null,
+      mode: options.mode,
       contractPath: normalizeSlash(contractPath),
       reportPath: normalizeSlash(reportPath),
       recipesDir: normalizeSlash(recipesDir),

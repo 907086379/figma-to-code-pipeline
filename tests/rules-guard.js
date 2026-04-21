@@ -33,6 +33,15 @@ mustContainAll("cursor-bootstrap/rules/00-output-token-budget.mdc", [
 ]);
 
 // Rule 01: core cache workflow and hard gates must remain.
+mustContainAll("cursor-bootstrap/rules/07-karpathy-coding-discipline.mdc", [
+  "先想清楚再写",
+  "最小够用实现",
+  "手术式改动",
+  "目标可验证",
+  "pnpm test",
+  "fc:validate",
+]);
+
 mustContainAll("cursor-bootstrap/rules/01-figma-cache-core.mdc", [
   "标准化链接并读取 `figma-cache/index.json`",
   "命中且字段足够：只读本地，不调 MCP",

@@ -3,6 +3,7 @@
 > **给 Cursor Agent 的指令**：你正在操作的是**用户业务项目**的根目录。以下文件应已存在（由 `npx figma-cache cursor init` 从 npm 包 **`{{NPM_PACKAGE_NAME}}`** 复制到当前仓库根）：
 > - `.cursor/rules/01-figma-cache-core.mdc`
 > - `.cursor/rules/00-output-token-budget.mdc`（通用低 token 输出基线）
+> - `.cursor/rules/07-karpathy-coding-discipline.mdc`（编码纪律精华：最小实现、手术式 diff、可验证完成）
 > - `.cursor/rules/04-ui-baseline-governance.mdc`（UI 全局基线治理：新项目/老项目双轨 + 生成约束）
 > - `.cursor/rules/02-figma-stack-adapter.mdc`（**占位**，任务完成后需删除）
 > - `.cursor/rules/figma-local-cache-first.mdc`（可选保留）

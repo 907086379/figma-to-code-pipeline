@@ -23,21 +23,9 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
-
-function normalizeNodeId(input) {
-  const value = String(input || "").trim();
-  if (!value) return "";
-  return value.includes(":") ? value : value.replace(/-/g, ":");
-}
-
-function cacheKeyFromItem(item) {
-  const fileKey = String(item && item.fileKey ? item.fileKey : "").trim();
-  const nodeId = String(item && item.nodeId ? item.nodeId : "").trim();
-  if (!fileKey || !nodeId) return "";
-  return `${fileKey}#${normalizeNodeId(nodeId)}`;
-}
 
 function resolveTargetAbs(rawTarget) {
   const trimmed = String(rawTarget || "").trim();
@@ -107,24 +95,14 @@ function main() {
     process.exit(2);
   }
 
-  const payload = JSON.parse(fs.readFileSync(batchAbs, "utf8"));
-  if (!Array.isArray(payload) || payload.length === 0) {
-    console.error("[archive-artifacts-from-batch] batch must be a non-empty array");
-    process.exit(2);
-  }
+  const batch = readBatchV2(batchAbs, ROOT);
 
   let copiedCases = 0;
-  payload.forEach((item, idx) => {
-    const cacheKey = String(item && (item.cacheKey || cacheKeyFromItem(item)) || "").trim();
-    const targetAbs = resolveTargetAbs(item && item.target);
-    if (!cacheKey) {
-      console.error(`[archive-artifacts-from-batch] case[${idx}] missing cacheKey or (fileKey+nodeId)`);
-      process.exit(2);
-    }
-    if (!targetAbs) {
-      console.error(`[archive-artifacts-from-batch] case[${idx}] missing target`);
-      process.exit(2);
-    }
+  batch.cases.forEach((item) => {
+    const cacheKey = String(item.cacheKey || "").trim();
+    const targetAbs = resolveTargetAbs(item && item.target ? item.target.entry : "");
+    if (!cacheKey) throw new Error("[archive-artifacts-from-batch] cacheKey 为空（不应发生）");
+    if (!targetAbs) throw new Error(`[archive-artifacts-from-batch] case[${item.index}] target.entry 为空（不应发生）`);
 
     const outRootAbs = path.isAbsolute(args.outRoot) ? args.outRoot : path.join(ROOT, args.outRoot);
     const targetRelDir = sanitizeForPath(

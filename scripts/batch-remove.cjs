@@ -2,7 +2,7 @@
 "use strict";
 
 /**
- * Remove one case from figma-e2e-batch.json by matching (fileKey + nodeId).
+ * 从 figma-e2e-batch.json（v2）移除一个 case（按 designRef.fileKey + designRef.nodeId 匹配）。
  *
  * Usage:
  *   node scripts/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--batch=figma-e2e-batch.json] [--fileKey=...]
@@ -10,6 +10,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { writeBatchV2 } = require("./ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_BATCH = "figma-e2e-batch.json";
@@ -84,10 +85,10 @@ function main() {
   if (!args.input) {
     console.error(
       [
-        "usage:",
+        "用法：",
         '  node scripts/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--fileKey=...]',
         "",
-        "examples:",
+        "示例：",
         '  node scripts/batch-remove.cjs "https://www.figma.com/design/<fileKey>/...?node-id=9278-30676"',
         '  node scripts/batch-remove.cjs "53hw0wDvgOzH14DXSsnEmE#9278:30676"',
         '  node scripts/batch-remove.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE',
@@ -103,10 +104,15 @@ function main() {
   }
 
   const payload = readJson(batchAbs);
-  if (!Array.isArray(payload)) {
-    console.error("batch file must be a JSON array");
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    console.error("batch(v2) 顶层必须是对象：{ version:2, cases:[...] }");
     process.exit(2);
   }
+  if (Number(payload.version) !== 2) {
+    console.error(`batch(v2) version 必须为 2，实际：${JSON.stringify(payload.version)}`);
+    process.exit(2);
+  }
+  const cases = Array.isArray(payload.cases) ? payload.cases : [];
 
   const parsed = tryParseFigmaUrl(args.input) || tryParseCacheKey(args.input) || tryParseNodeIdOnly(args.input);
 
@@ -127,12 +133,19 @@ function main() {
   }
 
   const normalizedNodeId = normalizeNodeIdForBatch(nodeId);
-  const before = payload.length;
-  const next = payload.filter(
-    (x) => !(x && x.fileKey === fileKey && String(x.nodeId || "").trim() === normalizedNodeId)
+  const before = cases.length;
+  const nextCases = cases.filter(
+    (x) =>
+      !(
+        x &&
+        x.designRef &&
+        String(x.designRef.fileKey || "").trim() === fileKey &&
+        String(x.designRef.nodeId || "").trim() === normalizedNodeId
+      )
   );
-  const removed = before - next.length;
-  writeJson(batchAbs, next);
+  const removed = before - nextCases.length;
+  const next = { ...payload, version: 2, cases: nextCases };
+  writeBatchV2(batchAbs, ROOT, next);
   console.log(`[batch-remove] removed=${removed}`);
 }
 

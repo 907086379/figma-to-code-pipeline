@@ -63,4 +63,3 @@ npm run verify:docs && npm test
 | 链接 / flow 边类型规范 | `figma-cache/docs/link-normalization-spec.md`、`flow-edge-taxonomy.md` |
 | 接入任务书 | `AGENT-SETUP-PROMPT.md`（`cursor init` 刷新到业务根） |
 | 人读总览（治理、`figma-flow-readme`、移动端可选） | `docs/README.md`、`docs/figma-flow-readme.md` |
-| 跨仓 `fc:ui:e2e:cross` 编排 | `UI-E2E-AUTOMATION-WORKFLOW.md` |

@@ -21,7 +21,7 @@
 
 P0 目标：
 
-1. 新增 `fc:ui:preflight` 命令（脚本 `scripts/ui-preflight.js`）。
+1. 新增 `fc:ui:preflight` 命令（脚本 `scripts/ui/ui-preflight.js`）。
 2. 生成结构化报告（默认输出到 `figma-cache/reports/ui-preflight-report.json`）。
 3. 存在阻断项时返回非零退出码（建议 `2`）。
 4. 将 preflight 接到 `fc:ui:gate` 前置步骤。
@@ -43,7 +43,7 @@ P0 目标：
 
 ### 3.1 新增
 
-- `scripts/ui-preflight.js`
+- `scripts/ui/ui-preflight.js`
 
 ### 3.2 修改
 
@@ -61,7 +61,7 @@ P0 目标：
 
 ---
 
-## 4. `scripts/ui-preflight.js` 规格（执行标准）
+## 4. `scripts/ui/ui-preflight.js` 规格（执行标准）
 
 ## 4.1 CLI 参数
 
@@ -142,7 +142,7 @@ warning（不阻断，可积累）：
 调整 `package.json`：
 
 - 新增：
-  - `"fc:ui:preflight": "node scripts/ui-preflight.js"`
+  - `"fc:ui:preflight": "node scripts/ui/ui-preflight.js"`
 - 调整：
   - `"fc:ui:gate": "npm run fc:ui:preflight && npm run fc:validate && npm run verify:cursor && npm test"`
 
@@ -186,7 +186,7 @@ warning（不阻断，可积累）：
 ```text
 feat(gate): 新增 figma ui preflight 结构化门禁并接入 fc:ui:gate
 
-- 新增 scripts/ui-preflight.js，输出 ui-preflight-report.json 并对阻断项返回 exit code 2。
+- 新增 scripts/ui/ui-preflight.js，输出 ui-preflight-report.json 并对阻断项返回 exit code 2。
 - 在 package.json 增加 fc:ui:preflight，且将 fc:ui:gate 前置 preflight 执行。
 - 扩展 smoke 覆盖 preflight 的正负场景与报告落盘断言。
 - 同步 README 与 figma-cache/docs/README.md，补充 preflight 使用说明与报告字段。

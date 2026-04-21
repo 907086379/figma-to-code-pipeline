@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 4.0.0（2026-04-21）
+
+- **Breaking：scripts 目录分层**：`scripts/*` 调整为 `scripts/ui/*`、`scripts/workflow/*`、`scripts/verify/*` 三层；npm scripts 与测试用例已同步更新。
+- **Breaking：移除跨仓与自动挂载链路**：删除 `cross-project-e2e`、`ui-mount-batch` 及相关 batch/auto-link/archive 辅助脚本；demo/规则文档已改为“手动挂载”口径。
+- **批处理能力增强**：`batch-add.cjs` 固化命名证据（优先 mcp-raw data-name / export default function / fallback nodeId）并输出 relations/suggestions 报告；新增 `scripts/workflow/apply-engineering-suggestions.cjs` 支持 auto/strict 两种自动应用模式。
+
 ## 3.0.1（2026-04-21）
 
 - 文档：仓库根 **`docs/`** 合并为人读总览 **`docs/README.md`**（含原 `cursor-local-governance`、`mobile-native-adapter-template`）；**`docs/figma-flow-readme.md`** 保留为 `postEnsure` 默认登记骨架并去除过时示例节点。

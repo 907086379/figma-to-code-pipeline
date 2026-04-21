@@ -5,24 +5,19 @@
  * 从 figma-e2e-batch.json（v2）移除一个 case（按 designRef.fileKey + designRef.nodeId 匹配）。
  *
  * Usage:
- *   node scripts/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--batch=figma-e2e-batch.json] [--fileKey=...]
+ *   node scripts/workflow/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--batch=figma-e2e-batch.json] [--fileKey=...]
  */
 
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
-const { writeBatchV2 } = require("./ui-batch-v2.cjs");
+const { parseCli } = require("../cli-args.cjs");
+const { writeBatchV2 } = require("../ui/ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_BATCH = "figma-e2e-batch.json";
 
 function readJson(absPath) {
   return JSON.parse(fs.readFileSync(absPath, "utf8"));
-}
-
-function writeJson(absPath, payload) {
-  fs.mkdirSync(path.dirname(absPath), { recursive: true });
-  fs.writeFileSync(absPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 function normalizeNodeIdForBatch(nodeId) {
@@ -77,9 +72,25 @@ function parseArgs() {
 }
 
 function inferFileKeyFromExistingBatch(batchPayload) {
-  if (!Array.isArray(batchPayload) || batchPayload.length === 0) return "";
+  const cases =
+    batchPayload &&
+    typeof batchPayload === "object" &&
+    Array.isArray(batchPayload.cases)
+      ? batchPayload.cases
+      : Array.isArray(batchPayload)
+        ? batchPayload
+        : [];
+  if (!cases.length) return "";
   const keys = Array.from(
-    new Set(batchPayload.map((x) => (x && x.fileKey ? String(x.fileKey).trim() : "")).filter(Boolean))
+    new Set(
+      cases
+        .map((x) =>
+          String(
+            x && x.designRef && x.designRef.fileKey ? x.designRef.fileKey : "",
+          ).trim(),
+        )
+        .filter(Boolean),
+    ),
   );
   return keys.length === 1 ? keys[0] : "";
 }
@@ -90,18 +101,20 @@ function main() {
     console.error(
       [
         "用法：",
-        '  node scripts/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--fileKey=...]',
+        '  node scripts/workflow/batch-remove.cjs "<figma-url|cacheKey|node-id>" [--fileKey=...]',
         "",
         "示例：",
-        '  node scripts/batch-remove.cjs "https://www.figma.com/design/<fileKey>/...?node-id=9278-30676"',
-        '  node scripts/batch-remove.cjs "53hw0wDvgOzH14DXSsnEmE#9278:30676"',
-        '  node scripts/batch-remove.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE',
-      ].join("\n")
+        '  node scripts/workflow/batch-remove.cjs "https://www.figma.com/design/<fileKey>/...?node-id=9278-30676"',
+        '  node scripts/workflow/batch-remove.cjs "53hw0wDvgOzH14DXSsnEmE#9278:30676"',
+        '  node scripts/workflow/batch-remove.cjs "9278-30676" --fileKey=53hw0wDvgOzH14DXSsnEmE',
+      ].join("\n"),
     );
     process.exit(2);
   }
 
-  const batchAbs = path.isAbsolute(args.batch) ? path.normalize(args.batch) : path.join(ROOT, args.batch);
+  const batchAbs = path.isAbsolute(args.batch)
+    ? path.normalize(args.batch)
+    : path.join(ROOT, args.batch);
   if (!fs.existsSync(batchAbs)) {
     console.error(`batch file missing: ${batchAbs}`);
     process.exit(2);
@@ -113,26 +126,37 @@ function main() {
     process.exit(2);
   }
   if (Number(payload.version) !== 2) {
-    console.error(`batch(v2) version 必须为 2，实际：${JSON.stringify(payload.version)}`);
+    console.error(
+      `batch(v2) version 必须为 2，实际：${JSON.stringify(payload.version)}`,
+    );
     process.exit(2);
   }
   const cases = Array.isArray(payload.cases) ? payload.cases : [];
 
-  const parsed = tryParseFigmaUrl(args.input) || tryParseCacheKey(args.input) || tryParseNodeIdOnly(args.input);
+  const parsed =
+    tryParseFigmaUrl(args.input) ||
+    tryParseCacheKey(args.input) ||
+    tryParseNodeIdOnly(args.input);
 
   const fileKey =
     String(args.fileKey || "").trim() ||
     (parsed && parsed.fileKey ? String(parsed.fileKey).trim() : "") ||
     inferFileKeyFromExistingBatch(payload);
 
-  const nodeId = String(args.nodeId || "").trim() || (parsed && parsed.nodeId ? String(parsed.nodeId).trim() : "");
+  const nodeId =
+    String(args.nodeId || "").trim() ||
+    (parsed && parsed.nodeId ? String(parsed.nodeId).trim() : "");
 
   if (!fileKey) {
-    console.error("missing fileKey (provide full URL / cacheKey / --fileKey=...)");
+    console.error(
+      "missing fileKey (provide full URL / cacheKey / --fileKey=...)",
+    );
     process.exit(2);
   }
   if (!nodeId) {
-    console.error("missing nodeId (expected node-id like 9278-30676 or 9278:30676)");
+    console.error(
+      "missing nodeId (expected node-id like 9278-30676 or 9278:30676)",
+    );
     process.exit(2);
   }
 
@@ -145,7 +169,7 @@ function main() {
         x.designRef &&
         String(x.designRef.fileKey || "").trim() === fileKey &&
         String(x.designRef.nodeId || "").trim() === normalizedNodeId
-      )
+      ),
   );
   const removed = before - nextCases.length;
   const next = { ...payload, version: 2, cases: nextCases };
@@ -154,4 +178,3 @@ function main() {
 }
 
 main();
-

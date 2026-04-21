@@ -8,7 +8,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.join(__dirname, "..");
+const ROOT = path.join(__dirname, "..", "..");
 
 function readPkg() {
   return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
@@ -49,22 +49,8 @@ function expandFilesField(pkg) {
       }
       continue;
     }
-    if (e === "scripts/*.js") {
-      const dir = path.join(ROOT, "scripts");
-      for (const name of fs.readdirSync(dir)) {
-        if (name.endsWith(".js") && !fs.statSync(path.join(dir, name)).isDirectory()) {
-          out.add(`scripts/${name}`);
-        }
-      }
-      continue;
-    }
-    if (e === "scripts/*.cjs") {
-      const dir = path.join(ROOT, "scripts");
-      for (const name of fs.readdirSync(dir)) {
-        if (name.endsWith(".cjs")) {
-          out.add(`scripts/${name}`);
-        }
-      }
+    if (e === "scripts/**/*.js" || e === "scripts/**/*.cjs") {
+      listFilesRecursive("scripts", out);
       continue;
     }
     if (e === "figma-cache/adapters/recipes/*.json") {
@@ -106,13 +92,11 @@ const REQUIRED = [
   "figma-cache/figma-cache.js",
   "figma-cache/js/validate-cli.js",
   "scripts/batch-add.cjs",
-  "scripts/batch-remove.cjs",
-  "scripts/ui-mount-batch.cjs",
-  "scripts/generate-icon-insets-from-batch.cjs",
+  "scripts/workflow/batch-remove.cjs",
   "scripts/generate-icon-insets.cjs",
   "scripts/forbidden-markup-check.cjs",
-  "scripts/check-cursor-shadow.js",
-  "scripts/check-doc-encoding.js",
+  "scripts/verify/check-cursor-shadow.js",
+  "scripts/verify/check-doc-encoding.js",
   "scripts/mobile/generate-mobile-spec.js",
   "cursor-bootstrap/managed-files.json",
 ];

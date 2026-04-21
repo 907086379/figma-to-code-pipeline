@@ -2,3 +2,6 @@ node_modules/
 *.tgz
 README.owner.md
 figma-cache/reports/runtime/*.json
+
+# pnpm / tooling residue (avoid search noise)
+node_modules/.ignored_figma-to-code-pipeline/

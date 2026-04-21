@@ -25,7 +25,7 @@ alwaysApply: true
   - `--target-root=...`
   - 项目根放置 `figma-ui-batch.config.json` 统一配置 `targetRoot/targetTemplate`
 
-## 4) 自动挂载到页面（用于真实运行验证）
+## 4) 挂载到页面（用于真实运行验证）
 为保证“生成即能看见”，每次生成/修复 batch 目标组件后，必须把它挂载到页面用于运行验证：
 
 - 挂载点优先级：
@@ -34,9 +34,6 @@ alwaysApply: true
 - 挂载方式：
   - 在 `<script setup>` 里 import `target` 对应的组件
   - 在 `<template>` 里渲染该组件一次
-
-可选（推荐工程化）：直接用工具链脚本自动完成挂载：
-- `node node_modules/figma-to-code-pipeline/scripts/ui-mount-batch.cjs --batch=./figma-e2e-batch.json`
 
 约束：
 - 挂载只用于 demo/联调，不要引入额外依赖。

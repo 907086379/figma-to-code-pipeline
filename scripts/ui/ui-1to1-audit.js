@@ -4,8 +4,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
-const { normalizeUiFacts, normalizeHexColor } = require("../figma-cache/js/ui-facts-normalizer");
+const { parseCli } = require("../cli-args.cjs");
+const {
+  normalizeUiFacts,
+  normalizeHexColor,
+} = require("../../figma-cache/js/ui-facts-normalizer");
 const { getUiProfileConfig } = require("./ui-profile");
 
 const ROOT = process.cwd();
@@ -31,8 +34,14 @@ function filterRemoteFigmaAssetRefs(input) {
   // Mask Figma MCP asset URLs (often require auth; non-deterministic in runtime).
   // This keeps audits stable when teams choose to not ship remote figma assets.
   return text
-    .replace(/https:\/\/www\.figma\.com\/api\/mcp\/asset\/[a-z0-9-]+/gi, "__FIGMA_MCP_ASSET__")
-    .replace(/\bimg[A-Za-z0-9_]*\s*=\s*['"]https:\/\/www\.figma\.com\/api\/mcp\/asset\/[a-z0-9-]+['"]/gi, "img__=__FIGMA_MCP_ASSET__");
+    .replace(
+      /https:\/\/www\.figma\.com\/api\/mcp\/asset\/[a-z0-9-]+/gi,
+      "__FIGMA_MCP_ASSET__",
+    )
+    .replace(
+      /\bimg[A-Za-z0-9_]*\s*=\s*['"]https:\/\/www\.figma\.com\/api\/mcp\/asset\/[a-z0-9-]+['"]/gi,
+      "img__=__FIGMA_MCP_ASSET__",
+    );
 }
 
 function normalizeSlash(input) {
@@ -43,7 +52,9 @@ function resolveMaybeAbsolutePath(input) {
   if (!input) {
     return "";
   }
-  return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
+  return path.isAbsolute(input)
+    ? path.normalize(input)
+    : path.join(ROOT, input);
 }
 
 function readJsonOrNull(absPath) {
@@ -65,7 +76,15 @@ function readTextOrEmpty(absPath) {
 function parseArgs(argvSlice) {
   const synthetic = ["node", "ui-1to1-audit.js", ...(argvSlice || [])];
   const { values, flags, positionals, unknown } = parseCli(synthetic, {
-    strings: ["cacheKey", "target", "mode", "contract", "report", "recipes-dir", "min-score"],
+    strings: [
+      "cacheKey",
+      "target",
+      "mode",
+      "contract",
+      "report",
+      "recipes-dir",
+      "min-score",
+    ],
     booleanFlags: ["no-filter-remote-figma-assets"],
   });
   const options = {
@@ -76,7 +95,10 @@ function parseArgs(argvSlice) {
     reportPath: (values.report || "").trim() || DEFAULT_REPORT_PATH,
     minScore: DEFAULT_MIN_SCORE,
     recipesDir: (values["recipes-dir"] || "").trim() || DEFAULT_RECIPES_DIR,
-    filterRemoteFigmaAssets: parseBoolEnv(process.env.FIGMA_UI_FILTER_REMOTE_FIGMA_ASSETS, true),
+    filterRemoteFigmaAssets: parseBoolEnv(
+      process.env.FIGMA_UI_FILTER_REMOTE_FIGMA_ASSETS,
+      true,
+    ),
     unknownArgs: [...unknown],
   };
   if (flags["no-filter-remote-figma-assets"]) {
@@ -89,7 +111,9 @@ function parseArgs(argvSlice) {
   }
   const pos = positionals.filter(Boolean);
   if (!options.cacheKey) {
-    const ck = pos.find((p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p));
+    const ck = pos.find(
+      (p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p),
+    );
     if (ck) options.cacheKey = ck.trim();
   }
   if (!options.targetPath) {
@@ -138,7 +162,9 @@ function readVariableDefsFromManifest(metaPath) {
   ) {
     return null;
   }
-  return readJsonOrNull(path.join(nodeDir, "mcp-raw", String(manifest.files.get_variable_defs)));
+  return readJsonOrNull(
+    path.join(nodeDir, "mcp-raw", String(manifest.files.get_variable_defs)),
+  );
 }
 
 function loadRecipes(recipesDirAbs) {
@@ -165,15 +191,19 @@ function detectMatchedRecipes(recipes, contextText, statesInCache) {
     .map((recipe) => {
       const keywords = [
         String(recipe.id || "").toLowerCase(),
-        ...(Array.isArray(recipe.structureTemplate) ? recipe.structureTemplate : []),
-        ...(recipe.stateMachine && Array.isArray(recipe.stateMachine.requiredStates)
+        ...(Array.isArray(recipe.structureTemplate)
+          ? recipe.structureTemplate
+          : []),
+        ...(recipe.stateMachine &&
+        Array.isArray(recipe.stateMachine.requiredStates)
           ? recipe.stateMachine.requiredStates
           : []),
       ]
         .map((k) => String(k || "").toLowerCase())
         .filter(Boolean);
       const matchedKeywords = keywords.filter(
-        (keyword) => context.includes(keyword) || statesInCache.includes(keyword)
+        (keyword) =>
+          context.includes(keyword) || statesInCache.includes(keyword),
       );
       return {
         id: String(recipe.id || "").toLowerCase(),
@@ -215,9 +245,13 @@ function scoreItem(params) {
   const paths = item.paths && typeof item.paths === "object" ? item.paths : {};
   const metaPath = paths.meta ? resolveMaybeAbsolutePath(paths.meta) : "";
   const specPath = paths.spec ? resolveMaybeAbsolutePath(paths.spec) : "";
-  const stateMapPath = paths.stateMap ? resolveMaybeAbsolutePath(paths.stateMap) : "";
+  const stateMapPath = paths.stateMap
+    ? resolveMaybeAbsolutePath(paths.stateMap)
+    : "";
   const rawPath = paths.raw ? resolveMaybeAbsolutePath(paths.raw) : "";
-  const entryReady = [metaPath, specPath, stateMapPath, rawPath].every((p) => !!p && fs.existsSync(p));
+  const entryReady = [metaPath, specPath, stateMapPath, rawPath].every(
+    (p) => !!p && fs.existsSync(p),
+  );
   if (!entryReady) {
     // html-partial 允许最小集合缺失时尽量产出报告，不默认失败
     if (String(options.mode) === "html-partial") {
@@ -230,14 +264,18 @@ function scoreItem(params) {
   const specText = readTextOrEmpty(specPath);
   const stateMapText = readTextOrEmpty(stateMapPath);
   const rawJson = readJsonOrNull(rawPath) || {};
-  const completeness = Array.isArray(item.completeness) ? item.completeness : [];
+  const completeness = Array.isArray(item.completeness)
+    ? item.completeness
+    : [];
   const evidence =
     rawJson.coverageSummary &&
     rawJson.coverageSummary.evidence &&
     typeof rawJson.coverageSummary.evidence === "object"
       ? rawJson.coverageSummary.evidence
       : {};
-  const evidenceReady = completeness.every((k) => Array.isArray(evidence[k]) && evidence[k].length > 0);
+  const evidenceReady = completeness.every(
+    (k) => Array.isArray(evidence[k]) && evidence[k].length > 0,
+  );
   if (!evidenceReady) {
     if (String(options.mode) === "html-partial") {
       warnings.push("coverage evidence 不完整（html-partial：不默认失败）");
@@ -259,31 +297,51 @@ function scoreItem(params) {
   const tokenFacts = normalizedFacts.facts.tokens;
   const statesInCache = normalizedFacts.facts.states;
 
-  const contractTokens = Array.isArray(contract && contract.tokenMappings) ? contract.tokenMappings : [];
+  const contractTokens = Array.isArray(contract && contract.tokenMappings)
+    ? contract.tokenMappings
+    : [];
   const contractStates =
-    contract && contract.stateMappings && typeof contract.stateMappings === "object"
+    contract &&
+    contract.stateMappings &&
+    typeof contract.stateMappings === "object"
       ? Object.values(contract.stateMappings)
-          .flatMap((entry) => (Array.isArray(entry.requiredStates) ? entry.requiredStates : []))
-          .map((v) => String(v || "").trim().toLowerCase())
+          .flatMap((entry) =>
+            Array.isArray(entry.requiredStates) ? entry.requiredStates : [],
+          )
+          .map((v) =>
+            String(v || "")
+              .trim()
+              .toLowerCase(),
+          )
           .filter(Boolean)
       : [];
 
   const tokenMappedHits = tokenFacts.filter((fact) => {
-    const name = String(fact.name || "").trim().toLowerCase();
+    const name = String(fact.name || "")
+      .trim()
+      .toLowerCase();
     const value = normalizeHexColor(String(fact.value || ""));
     return contractTokens.some((token) => {
-      const tokenName = String(token.figmaToken || "").trim().toLowerCase();
+      const tokenName = String(token.figmaToken || "")
+        .trim()
+        .toLowerCase();
       const tokenValue = normalizeHexColor(String(token.figmaValue || ""));
       return (name && name === tokenName) || (value && value === tokenValue);
     });
   }).length;
-  const tokenCoverage = tokenFacts.length ? tokenMappedHits / tokenFacts.length : 1;
+  const tokenCoverage = tokenFacts.length
+    ? tokenMappedHits / tokenFacts.length
+    : 1;
   if (tokenCoverage < 1) {
     diffs.push(`token mapping coverage ${Math.round(tokenCoverage * 100)}%`);
   }
 
-  const stateHits = statesInCache.filter((state) => contractStates.includes(state)).length;
-  const stateCoverage = statesInCache.length ? stateHits / statesInCache.length : 1;
+  const stateHits = statesInCache.filter((state) =>
+    contractStates.includes(state),
+  ).length;
+  const stateCoverage = statesInCache.length
+    ? stateHits / statesInCache.length
+    : 1;
   if (stateCoverage < 1) {
     diffs.push(`state mapping coverage ${Math.round(stateCoverage * 100)}%`);
   }
@@ -296,7 +354,7 @@ function scoreItem(params) {
   const matchedRecipes = detectMatchedRecipes(
     recipes,
     `${specText}\n${stateMapText}\n${JSON.stringify(rawJson || {})}\n${effectiveTargetCode}`,
-    statesInCache
+    statesInCache,
   );
   if (!matchedRecipes.length) {
     warnings.push("no recipe matched; consider adding project recipe");
@@ -312,25 +370,49 @@ function scoreItem(params) {
 
   const isHtmlPartial = String(options.mode) === "html-partial";
 
-  const textCodeHits = hasTargetCode ? textFacts.filter((fact) => effectiveTargetCode.includes(fact)).length : textFacts.length;
+  const textCodeHits = hasTargetCode
+    ? textFacts.filter((fact) => effectiveTargetCode.includes(fact)).length
+    : textFacts.length;
   const tokenCodeHits = hasTargetCode
     ? tokenFacts.filter((fact) =>
-        effectiveTargetCode.toUpperCase().includes(String(normalizeHexColor(fact.value || "")).toUpperCase())
+        effectiveTargetCode
+          .toUpperCase()
+          .includes(String(normalizeHexColor(fact.value || "")).toUpperCase()),
       ).length
     : tokenFacts.length;
   const stateCodeHits = hasTargetCode
-    ? statesInCache.filter((state) => effectiveTargetCode.toLowerCase().includes(state)).length
+    ? statesInCache.filter((state) =>
+        effectiveTargetCode.toLowerCase().includes(state),
+      ).length
     : statesInCache.length;
 
   const layoutScore = isHtmlPartial ? null : entryReady ? 100 : 20;
-  const textScore = clampScore(100 * (textFacts.length ? textCodeHits / textFacts.length : 1));
+  const textScore = clampScore(
+    100 * (textFacts.length ? textCodeHits / textFacts.length : 1),
+  );
   const tokenScore = isHtmlPartial
-    ? clampScore(100 * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1))
-    : clampScore(100 * tokenCoverage * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1));
+    ? clampScore(
+        100 * (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1),
+      )
+    : clampScore(
+        100 *
+          tokenCoverage *
+          (tokenFacts.length ? tokenCodeHits / tokenFacts.length : 1),
+      );
   const stateScore = isHtmlPartial
     ? null
-    : clampScore(100 * stateCoverage * (statesInCache.length ? stateCodeHits / statesInCache.length : 1));
-  const interactionScore = isHtmlPartial ? null : hasTodo ? 70 : normalizedFacts.dimensions.interactionReady ? 100 : 80;
+    : clampScore(
+        100 *
+          stateCoverage *
+          (statesInCache.length ? stateCodeHits / statesInCache.length : 1),
+      );
+  const interactionScore = isHtmlPartial
+    ? null
+    : hasTodo
+      ? 70
+      : normalizedFacts.dimensions.interactionReady
+        ? 100
+        : 80;
 
   if (isHtmlPartial) {
     skippedDimensions.push("layout", "states", "interactions", "accessibility");
@@ -338,10 +420,20 @@ function scoreItem(params) {
 
   let totalScore = 0;
   if (isHtmlPartial) {
-    const totalParts = [textScore, tokenScore].filter((n) => Number.isFinite(Number(n)));
+    const totalParts = [textScore, tokenScore].filter((n) =>
+      Number.isFinite(Number(n)),
+    );
     totalScore = clampScore(average(totalParts.length ? totalParts : [0]));
   } else {
-    totalScore = clampScore(average([layoutScore, textScore, tokenScore, stateScore, interactionScore]));
+    totalScore = clampScore(
+      average([
+        layoutScore,
+        textScore,
+        tokenScore,
+        stateScore,
+        interactionScore,
+      ]),
+    );
     if (!hasTargetCode) {
       // 兼容“未提供 target code”的基线模式：在不阻塞的前提下，给一个可用的分数下限。
       if (!blocking.length) {
@@ -380,7 +472,9 @@ function run() {
     process.exit(FAIL_EXIT_CODE);
   }
   if (!["web-strict", "html-partial"].includes(String(options.mode))) {
-    console.error(`ui-1to1-audit failed: --mode 仅支持 web-strict/html-partial，实际：${JSON.stringify(options.mode)}`);
+    console.error(
+      `ui-1to1-audit failed: --mode 仅支持 web-strict/html-partial，实际：${JSON.stringify(options.mode)}`,
+    );
     process.exit(FAIL_EXIT_CODE);
   }
 
@@ -391,15 +485,20 @@ function run() {
   const contractPath = resolveMaybeAbsolutePath(options.contractPath);
   const reportPath = resolveMaybeAbsolutePath(options.reportPath);
   const recipesDir = resolveMaybeAbsolutePath(options.recipesDir);
-  const targetPath = options.targetPath ? resolveMaybeAbsolutePath(options.targetPath) : "";
+  const targetPath = options.targetPath
+    ? resolveMaybeAbsolutePath(options.targetPath)
+    : "";
   if (profileConfig.auditRequireTargetPath && !targetPath) {
-    console.error(`ui-1to1-audit failed: profile '${profileConfig.profile}' requires --target`);
+    console.error(
+      `ui-1to1-audit failed: profile '${profileConfig.profile}' requires --target`,
+    );
     process.exit(FAIL_EXIT_CODE);
   }
 
   const index = readJsonOrNull(indexPath);
   const contract = readJsonOrNull(contractPath);
-  const items = index && index.items && typeof index.items === "object" ? index.items : {};
+  const items =
+    index && index.items && typeof index.items === "object" ? index.items : {};
   const targetKeys = options.cacheKey ? [options.cacheKey] : Object.keys(items);
   const targetCode = targetPath ? readTextOrEmpty(targetPath) : "";
   const recipes = loadRecipes(recipesDir);
@@ -412,7 +511,7 @@ function run() {
       targetCode,
       recipes,
       options,
-    })
+    }),
   );
 
   const blocking = [];
@@ -426,11 +525,19 @@ function run() {
       blocking.push("contract missing or invalid");
     }
   }
-  itemReports.forEach((item) => item.blocking.forEach((msg) => blocking.push(`${item.cacheKey}: ${msg}`)));
+  itemReports.forEach((item) =>
+    item.blocking.forEach((msg) => blocking.push(`${item.cacheKey}: ${msg}`)),
+  );
 
-  const warnings = itemReports.flatMap((item) => item.warnings.map((msg) => `${item.cacheKey}: ${msg}`));
-  const diffs = itemReports.flatMap((item) => item.diffs.map((msg) => `${item.cacheKey}: ${msg}`));
-  const totalScore = clampScore(average(itemReports.map((item) => item.score.total)));
+  const warnings = itemReports.flatMap((item) =>
+    item.warnings.map((msg) => `${item.cacheKey}: ${msg}`),
+  );
+  const diffs = itemReports.flatMap((item) =>
+    item.diffs.map((msg) => `${item.cacheKey}: ${msg}`),
+  );
+  const totalScore = clampScore(
+    average(itemReports.map((item) => item.score.total)),
+  );
 
   if (totalScore < minScore) {
     blocking.push(`score.total below threshold: ${totalScore} < ${minScore}`);
@@ -443,11 +550,19 @@ function run() {
       checkedItems: itemReports.length,
       score: {
         total: totalScore,
-        layout: clampScore(average(itemReports.map((item) => Number(item.score.layout || 0)))),
+        layout: clampScore(
+          average(itemReports.map((item) => Number(item.score.layout || 0))),
+        ),
         text: clampScore(average(itemReports.map((item) => item.score.text))),
         token: clampScore(average(itemReports.map((item) => item.score.token))),
-        state: clampScore(average(itemReports.map((item) => Number(item.score.state || 0)))),
-        interaction: clampScore(average(itemReports.map((item) => Number(item.score.interaction || 0)))),
+        state: clampScore(
+          average(itemReports.map((item) => Number(item.score.state || 0))),
+        ),
+        interaction: clampScore(
+          average(
+            itemReports.map((item) => Number(item.score.interaction || 0)),
+          ),
+        ),
       },
       blockingCount: blocking.length,
       warningCount: warnings.length,
@@ -455,10 +570,14 @@ function run() {
       minScore,
       profile: profileConfig.profile,
       recipesTotal: recipes.length,
-      recipesMatchedItems: itemReports.filter((item) => Array.isArray(item.matchedRecipes) && item.matchedRecipes.length > 0)
-        .length,
+      recipesMatchedItems: itemReports.filter(
+        (item) =>
+          Array.isArray(item.matchedRecipes) && item.matchedRecipes.length > 0,
+      ).length,
       auditMode: options.mode,
-      skippedDimensions: Array.from(new Set(itemReports.flatMap((x) => x.skippedDimensions || []))).filter(Boolean),
+      skippedDimensions: Array.from(
+        new Set(itemReports.flatMap((x) => x.skippedDimensions || [])),
+      ).filter(Boolean),
     },
     options: {
       cacheKey: options.cacheKey || null,

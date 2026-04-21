@@ -14,7 +14,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const forbiddenScript = path.join(root, "scripts", "forbidden-markup-check.cjs");
-const docEncodingScript = path.join(root, "scripts", "check-doc-encoding.js");
+const docEncodingScript = path.join(root, "scripts", "verify", "check-doc-encoding.js");
 const fixtureDir = path.join(root, "tests", "fixtures", "daily-guard");
 const cleanVue = path.join(fixtureDir, "clean.vue");
 const badVue = path.join(fixtureDir, "forbidden-button.vue");

@@ -4,7 +4,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
+const { parseCli } = require("../cli-args.cjs");
 
 const ROOT = process.cwd();
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
@@ -12,7 +12,9 @@ const FAIL_EXIT_CODE = 2;
 
 function resolveMaybeAbsolutePath(input) {
   if (!input) return "";
-  return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
+  return path.isAbsolute(input)
+    ? path.normalize(input)
+    : path.join(ROOT, input);
 }
 
 function normalizeNodeId(input) {
@@ -39,7 +41,9 @@ function parseArgs() {
     target: (values.target || "").trim(),
   };
   if (!out.cacheKey) {
-    const ck = positionals.find((p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p));
+    const ck = positionals.find(
+      (p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p),
+    );
     if (ck) out.cacheKey = ck.trim();
   }
   if (!out.target) {
@@ -64,12 +68,23 @@ function rawJsonAbsFromCacheKey(cacheKey) {
   const nodeId = normalizeNodeId(nodeIdRaw);
   const safeNodeDir = String(nodeId).replace(/:/g, "-");
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
-  return path.join(cacheDir, "files", fileKey, "nodes", safeNodeDir, "raw.json");
+  return path.join(
+    cacheDir,
+    "files",
+    fileKey,
+    "nodes",
+    safeNodeDir,
+    "raw.json",
+  );
 }
 
 function compileIconMap(registry, rawJson) {
-  const entries = Array.isArray(registry && registry.entries) ? registry.entries : [];
-  const metrics = Array.isArray(rawJson && rawJson.iconMetrics) ? rawJson.iconMetrics : [];
+  const entries = Array.isArray(registry && registry.entries)
+    ? registry.entries
+    : [];
+  const metrics = Array.isArray(rawJson && rawJson.iconMetrics)
+    ? rawJson.iconMetrics
+    : [];
   const out = {};
 
   metrics.forEach((m) => {
@@ -78,10 +93,13 @@ function compileIconMap(registry, rawJson) {
     if (!name || !nodeId) return;
 
     for (const entry of entries) {
-      const className = String(entry && entry.className ? entry.className : "").trim();
-      const matchers = entry && entry.match && Array.isArray(entry.match.figmaNodeNameRegex)
-        ? entry.match.figmaNodeNameRegex
-        : [];
+      const className = String(
+        entry && entry.className ? entry.className : "",
+      ).trim();
+      const matchers =
+        entry && entry.match && Array.isArray(entry.match.figmaNodeNameRegex)
+          ? entry.match.figmaNodeNameRegex
+          : [];
       if (!className || !matchers.length) continue;
       const ok = matchers.some((pat) => {
         try {
@@ -112,7 +130,7 @@ function injectIconHelpers(scriptBody, iconMap) {
   lines.push("};");
   lines.push("");
   lines.push("function iconRegistryClass(nodeId: string) {");
-  lines.push("  return ICON_CLASS_BY_NODEID[nodeId] || \"\";");
+  lines.push('  return ICON_CLASS_BY_NODEID[nodeId] || "";');
   lines.push("}");
   lines.push("");
 
@@ -123,12 +141,18 @@ function injectIconHelpers(scriptBody, iconMap) {
   const fnRe = /function\s+iconRegistryClass\s*\([\s\S]*?\n}\n/m;
   let next = scriptBody;
   if (mapRe.test(next)) {
-    next = next.replace(mapRe, `${block.match(/const ICON_CLASS_BY_NODEID[\s\S]*?\n};\n/m)[0]}`);
+    next = next.replace(
+      mapRe,
+      `${block.match(/const ICON_CLASS_BY_NODEID[\s\S]*?\n};\n/m)[0]}`,
+    );
   } else {
     next = `${next.replace(/\s+$/, "")}\n${block.match(/const ICON_CLASS_BY_NODEID[\s\S]*?\n};\n/m)[0]}\n`;
   }
   if (fnRe.test(next)) {
-    next = next.replace(fnRe, `${block.match(/function iconRegistryClass[\s\S]*?\n}\n/m)[0]}`);
+    next = next.replace(
+      fnRe,
+      `${block.match(/function iconRegistryClass[\s\S]*?\n}\n/m)[0]}`,
+    );
   } else {
     next = `${next.replace(/\s+$/, "")}\n${block.match(/function iconRegistryClass[\s\S]*?\n}\n/m)[0]}\n`;
   }
@@ -168,7 +192,9 @@ function main() {
     process.exit(0);
   }
   if (!args.cacheKey || !args.target) {
-    console.error("[ui-icon-rewrite] --cacheKey and --target required when registry exists");
+    console.error(
+      "[ui-icon-rewrite] --cacheKey and --target required when registry exists",
+    );
     process.exit(FAIL_EXIT_CODE);
   }
 
@@ -179,7 +205,8 @@ function main() {
   }
 
   const rawAbs = rawJsonAbsFromCacheKey(args.cacheKey);
-  const rawJson = rawAbs && fs.existsSync(rawAbs) ? readJsonOrNull(rawAbs) : null;
+  const rawJson =
+    rawAbs && fs.existsSync(rawAbs) ? readJsonOrNull(rawAbs) : null;
   const registry = readJsonOrNull(registryAbs);
   if (!rawJson || !registry) {
     process.exit(0);
@@ -202,14 +229,18 @@ function main() {
   if (m) {
     const body = String(m[1] || "");
     const injected = injectIconHelpers(body, iconMap);
-    next = next.replace(scriptRe, `<script setup lang="ts">${injected}</script>`);
+    next = next.replace(
+      scriptRe,
+      `<script setup lang="ts">${injected}</script>`,
+    );
   }
 
   if (next !== before) {
     fs.writeFileSync(targetAbs, next, "utf8");
-    console.log(`[ui-icon-rewrite] rewrote icons using registry: ${path.relative(ROOT, registryAbs)}`);
+    console.log(
+      `[ui-icon-rewrite] rewrote icons using registry: ${path.relative(ROOT, registryAbs)}`,
+    );
   }
 }
 
 main();
-

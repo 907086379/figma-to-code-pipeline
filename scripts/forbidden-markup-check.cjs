@@ -9,7 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parseCli } = require("./cli-args.cjs");
-const { readBatchV2 } = require("./ui-batch-v2.cjs");
+const { readBatchV2 } = require("./ui/ui-batch-v2.cjs");
 
 const ROOT = process.cwd();
 

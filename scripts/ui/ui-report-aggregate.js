@@ -4,18 +4,21 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
+const { parseCli } = require("../cli-args.cjs");
 const { getUiProfileConfig } = require("./ui-profile");
 
 const ROOT = process.cwd();
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
-const DEFAULT_OUTPUT_PATH = "figma-cache/reports/runtime/ui-quality-summary.json";
+const DEFAULT_OUTPUT_PATH =
+  "figma-cache/reports/runtime/ui-quality-summary.json";
 
 function resolveMaybeAbsolutePath(input) {
   if (!input) {
     return "";
   }
-  return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
+  return path.isAbsolute(input)
+    ? path.normalize(input)
+    : path.join(ROOT, input);
 }
 
 function readJsonOrNull(absPath) {
@@ -54,10 +57,12 @@ function run() {
   const options = parseArgs(process.argv.slice(2));
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
   const preflightPath = resolveMaybeAbsolutePath(
-    options.preflightReport || path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json")
+    options.preflightReport ||
+      path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json"),
   );
   const auditPath = resolveMaybeAbsolutePath(
-    options.auditReport || path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json")
+    options.auditReport ||
+      path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json"),
   );
   const outputPath = resolveMaybeAbsolutePath(options.output);
   const profileConfig = getUiProfileConfig();
@@ -68,10 +73,14 @@ function run() {
   const auditItems = Array.isArray(audit.items) ? audit.items : [];
 
   const preflightBlockingItems = preflightItems.filter(
-    (item) => Array.isArray(item.blocking) && item.blocking.length > 0
+    (item) => Array.isArray(item.blocking) && item.blocking.length > 0,
   ).length;
   const auditPassItems = auditItems.filter(
-    (item) => item && item.score && Number(item.score.total || 0) >= Number(audit.summary && audit.summary.minScore || 0)
+    (item) =>
+      item &&
+      item.score &&
+      Number(item.score.total || 0) >=
+        Number((audit.summary && audit.summary.minScore) || 0),
   ).length;
 
   const summary = {
@@ -83,17 +92,23 @@ function run() {
     },
     metrics: {
       checkedItems: preflightItems.length || auditItems.length,
-      preflightBlockingRate: ratio(preflightBlockingItems, preflightItems.length),
+      preflightBlockingRate: ratio(
+        preflightBlockingItems,
+        preflightItems.length,
+      ),
       auditPassRate: ratio(auditPassItems, auditItems.length),
       firstPassAcceptedRate: ratio(auditPassItems, auditItems.length),
       averageAuditScore: Number(
         (
-          auditItems.reduce((acc, item) => acc + Number(item && item.score && item.score.total || 0), 0) /
-          Math.max(1, auditItems.length)
-        ).toFixed(2)
+          auditItems.reduce(
+            (acc, item) =>
+              acc + Number((item && item.score && item.score.total) || 0),
+            0,
+          ) / Math.max(1, auditItems.length)
+        ).toFixed(2),
       ),
       reworkRoundsEstimate: Number(
-        (1 - ratio(auditPassItems, Math.max(1, auditItems.length))).toFixed(2)
+        (1 - ratio(auditPassItems, Math.max(1, auditItems.length))).toFixed(2),
       ),
     },
     trend: {

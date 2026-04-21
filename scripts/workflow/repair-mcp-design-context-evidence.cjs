@@ -6,7 +6,7 @@
  * mcp-raw-manifest.json get_design_context hashes/sizes when present.
  *
  * Usage:
- *   node scripts/repair-mcp-design-context-evidence.cjs [--root=<dir>]
+ *   node scripts/workflow/repair-mcp-design-context-evidence.cjs [--root=<dir>]
  *
  * Default --root is process.cwd().
  */
@@ -14,8 +14,8 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
-const { sanitizeDesignContextTextForCache } = require("./sanitize-design-context-for-cache.cjs");
+const { parseCli } = require("../cli-args.cjs");
+const { sanitizeDesignContextTextForCache } = require("../sanitize-design-context-for-cache.cjs");
 
 function sha256Utf8(text) {
   return crypto.createHash("sha256").update(String(text || ""), "utf8").digest("hex");

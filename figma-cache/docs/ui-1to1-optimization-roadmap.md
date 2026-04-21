@@ -30,7 +30,7 @@
 
 ## 1.2 交付物
 
-- `scripts/ui-preflight.js`
+- `scripts/ui/ui-preflight.js`
 - `figma-cache/reports/ui-preflight-report.json`
 - `package.json`：`fc:ui:preflight` + 更新 `fc:ui:gate`
 - `tests/smoke.js`：preflight 正负样例
@@ -51,7 +51,7 @@
 ## 2.2 交付物（建议）
 
 1. **质量审计脚本**
-   - 新增：`scripts/ui-1to1-audit.js`
+   - 新增：`scripts/ui/ui-1to1-audit.js`
    - 输入：`cacheKey`、目标组件路径、可选 contract
    - 输出：`figma-cache/reports/ui-1to1-report.json`
 
@@ -130,7 +130,7 @@
    - profile 映射到：preflight 严格度、审计阈值、是否强制预检文档
 
 2. **报告汇总与趋势分析**
-   - 新增：`scripts/ui-report-aggregate.js`
+   - 新增：`scripts/ui/ui-report-aggregate.js`
    - 汇总 `ui-preflight-report.json` + `ui-1to1-report.json`，输出周报/趋势
 
 3. **CI 质量门禁矩阵**

@@ -16,11 +16,10 @@ const { runSmokeCoreBasics } = require("./smoke-core-basics");
 
 const root = path.join(__dirname, "..");
 const bin = path.join(root, "bin", "figma-cache.js");
-const uiPreflightScript = path.join(root, "scripts", "ui-preflight.js");
-const uiAuditScript = path.join(root, "scripts", "ui-1to1-audit.js");
-const uiAggregateScript = path.join(root, "scripts", "ui-report-aggregate.js");
-const uiAutoAcceptanceScript = path.join(root, "scripts", "ui-auto-acceptance.js");
-const crossProjectE2EScript = path.join(root, "scripts", "cross-project-e2e.js");
+const uiPreflightScript = path.join(root, "scripts", "ui", "ui-preflight.js");
+const uiAuditScript = path.join(root, "scripts", "ui", "ui-1to1-audit.js");
+const uiAggregateScript = path.join(root, "scripts", "ui", "ui-report-aggregate.js");
+const uiAutoAcceptanceScript = path.join(root, "scripts", "ui", "ui-auto-acceptance.js");
 
 const TEST_URL = "https://www.figma.com/file/abcABCd0123456789vWxyZ/x?node-id=1-2";
 const FILE_KEY = "abcABCd0123456789vWxyZ";
@@ -72,10 +71,6 @@ function runUiAggregate(args, cwd, extraEnv) {
 
 function runUiAutoAcceptance(args, cwd, extraEnv) {
   return runNodeScript(uiAutoAcceptanceScript, args, cwd || root, extraEnv);
-}
-
-function runCrossProjectE2E(args, cwd, extraEnv) {
-  return runNodeScript(crossProjectE2EScript, args, cwd || root, extraEnv);
 }
 
 function expectThrow(fn, message) {
@@ -247,8 +242,7 @@ runSmokeCrossProjectAndCursorInit({
   path,
   root,
   expectThrow,
-  runInDir,
-  runCrossProjectE2E,
+  runInDir
 });
 
 console.log("smoke: ok");

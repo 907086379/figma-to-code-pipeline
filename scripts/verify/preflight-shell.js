@@ -8,7 +8,7 @@ const args = process.argv.slice(2);
 const modeArg = args.find((x) => x === "--strict" || x === "--warn") || "--warn";
 const mode = modeArg === "--strict" ? "strict" : "warn";
 
-const scriptPath = path.join(__dirname, "preflight.ps1");
+const scriptPath = path.join(__dirname, "..", "preflight.ps1");
 
 function runShell(exe, extraArgs) {
   const result = spawnSync(exe, extraArgs, {

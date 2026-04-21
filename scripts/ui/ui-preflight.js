@@ -4,14 +4,15 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseCli } = require("./cli-args.cjs");
+const { parseCli } = require("../cli-args.cjs");
 const { getUiProfileConfig } = require("./ui-profile");
 
 const ROOT = process.cwd();
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
 const INDEX_FILE_NAME = process.env.FIGMA_CACHE_INDEX_FILE || "index.json";
 const DEFAULT_CONTRACT_PATH = "figma-cache/adapters/ui-adapter.contract.json";
-const DEFAULT_REPORT_PATH = "figma-cache/reports/runtime/ui-preflight-report.json";
+const DEFAULT_REPORT_PATH =
+  "figma-cache/reports/runtime/ui-preflight-report.json";
 const BLOCKING_EXIT_CODE = 2;
 
 function normalizeSlash(input) {
@@ -22,7 +23,9 @@ function resolveMaybeAbsolutePath(input) {
   if (!input) {
     return "";
   }
-  return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
+  return path.isAbsolute(input)
+    ? path.normalize(input)
+    : path.join(ROOT, input);
 }
 
 function readJsonOrNull(absPath) {
@@ -89,7 +92,9 @@ function hasMappingEntries(contract, key) {
 }
 
 function checkCoverageEvidence(item, rawJson) {
-  const completeness = Array.isArray(item.completeness) ? item.completeness : [];
+  const completeness = Array.isArray(item.completeness)
+    ? item.completeness
+    : [];
   const evidence =
     rawJson &&
     rawJson.coverageSummary &&
@@ -145,13 +150,19 @@ function buildItemReport(cacheKey, item, contractReady) {
   const paths = item.paths && typeof item.paths === "object" ? item.paths : {};
   const absMeta = paths.meta ? resolveMaybeAbsolutePath(paths.meta) : "";
   const absSpec = paths.spec ? resolveMaybeAbsolutePath(paths.spec) : "";
-  const absStateMap = paths.stateMap ? resolveMaybeAbsolutePath(paths.stateMap) : "";
+  const absStateMap = paths.stateMap
+    ? resolveMaybeAbsolutePath(paths.stateMap)
+    : "";
   const absRaw = paths.raw ? resolveMaybeAbsolutePath(paths.raw) : "";
 
   const requiredFiles = [absMeta, absSpec, absStateMap, absRaw];
-  checks.entryFilesExist = requiredFiles.every((absPath) => !!absPath && fileExists(absPath));
+  checks.entryFilesExist = requiredFiles.every(
+    (absPath) => !!absPath && fileExists(absPath),
+  );
   if (!checks.entryFilesExist) {
-    blocking.push("entry file path missing or file not found (meta/spec/state-map/raw)");
+    blocking.push(
+      "entry file path missing or file not found (meta/spec/state-map/raw)",
+    );
   }
 
   const rawJson = absRaw ? readJsonOrNull(absRaw) : null;
@@ -220,16 +231,27 @@ function run() {
     stateMappingsReady: hasMappingEntries(contract, "stateMappings"),
   };
 
-  const items = index && index.items && typeof index.items === "object" ? index.items : {};
-  const targetCacheKeys = options.cacheKey ? [options.cacheKey] : Object.keys(items);
+  const items =
+    index && index.items && typeof index.items === "object" ? index.items : {};
+  const targetCacheKeys = options.cacheKey
+    ? [options.cacheKey]
+    : Object.keys(items);
 
   const reportItems = targetCacheKeys.map((cacheKey) =>
-    buildItemReport(cacheKey, items[cacheKey], contractReady)
+    buildItemReport(cacheKey, items[cacheKey], contractReady),
   );
 
-  const blockingCount = reportItems.reduce((acc, item) => acc + item.blocking.length, 0);
-  const warningCount = reportItems.reduce((acc, item) => acc + item.warnings.length, 0);
-  const warningBlockingCount = profileConfig.preflightTreatWarningsAsBlocking ? warningCount : 0;
+  const blockingCount = reportItems.reduce(
+    (acc, item) => acc + item.blocking.length,
+    0,
+  );
+  const warningCount = reportItems.reduce(
+    (acc, item) => acc + item.warnings.length,
+    0,
+  );
+  const warningBlockingCount = profileConfig.preflightTreatWarningsAsBlocking
+    ? warningCount
+    : 0;
   const hasBlocking = blockingCount + warningBlockingCount > 0;
 
   const report = {
@@ -254,7 +276,10 @@ function run() {
   ensureParentDir(reportPath);
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
-  if (report.ok || (options.allowWarn && blockingCount === 0 && warningBlockingCount === 0)) {
+  if (
+    report.ok ||
+    (options.allowWarn && blockingCount === 0 && warningBlockingCount === 0)
+  ) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }

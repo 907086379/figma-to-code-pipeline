@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { parseCli } = require("./cli-args.cjs");
+const { parseCli } = require("../cli-args.cjs");
 
 const ROOT = process.cwd();
 const SCRIPT_DIR = __dirname;
@@ -25,14 +25,23 @@ function rawJsonPathFromCacheKey(cacheKey) {
   const nodeId = normalizeNodeId(nodeIdRaw);
   const safeNodeDir = String(nodeId).replace(/:/g, "-");
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
-  return path.join(cacheDir, "files", fileKey, "nodes", safeNodeDir, "raw.json");
+  return path.join(
+    cacheDir,
+    "files",
+    fileKey,
+    "nodes",
+    safeNodeDir,
+    "raw.json",
+  );
 }
 
 function resolveMaybeAbsolutePath(input) {
   if (!input) {
     return "";
   }
-  return path.isAbsolute(input) ? path.normalize(input) : path.join(ROOT, input);
+  return path.isAbsolute(input)
+    ? path.normalize(input)
+    : path.join(ROOT, input);
 }
 
 function readJsonOrNull(absPath) {
@@ -85,7 +94,9 @@ function parseArgs(argvSlice) {
   options.maxWarnings = n("max-warnings", options.maxWarnings);
   options.maxDiffs = n("max-diffs", options.maxDiffs);
   if (!options.cacheKey) {
-    const ck = positionals.find((p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p));
+    const ck = positionals.find(
+      (p) => p.includes("#") && !/\.(vue|tsx|jsx|html)$/i.test(p),
+    );
     if (ck) options.cacheKey = ck.trim();
   }
   if (!options.target) {
@@ -112,13 +123,16 @@ function buildReportPaths(options) {
   const cacheDir = resolveMaybeAbsolutePath(CACHE_DIR_INPUT);
   return {
     preflight: resolveMaybeAbsolutePath(
-      options.preflightReport || path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json")
+      options.preflightReport ||
+        path.join(cacheDir, "reports", "runtime", "ui-preflight-report.json"),
     ),
     audit: resolveMaybeAbsolutePath(
-      options.auditReport || path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json")
+      options.auditReport ||
+        path.join(cacheDir, "reports", "runtime", "ui-1to1-report.json"),
     ),
     summary: resolveMaybeAbsolutePath(
-      options.summaryReport || path.join(cacheDir, "reports", "runtime", "ui-quality-summary.json")
+      options.summaryReport ||
+        path.join(cacheDir, "reports", "runtime", "ui-quality-summary.json"),
     ),
   };
 }
@@ -133,7 +147,9 @@ function evaluate(preflight, audit, summary, options) {
     if (preflight.ok !== true) {
       failures.push("preflight.ok is not true");
     }
-    const blockingCount = Number(preflight.summary && preflight.summary.blockingCount || 0);
+    const blockingCount = Number(
+      (preflight.summary && preflight.summary.blockingCount) || 0,
+    );
     if (blockingCount > 0) {
       failures.push(`preflight blocking count > 0 (${blockingCount})`);
     }
@@ -145,17 +161,27 @@ function evaluate(preflight, audit, summary, options) {
     if (audit.ok !== true) {
       failures.push("audit.ok is not true");
     }
-    const score = Number(audit.summary && audit.summary.score && audit.summary.score.total || 0);
+    const score = Number(
+      (audit.summary && audit.summary.score && audit.summary.score.total) || 0,
+    );
     if (score < options.minScore) {
-      failures.push(`audit total score too low (${score} < ${options.minScore})`);
+      failures.push(
+        `audit total score too low (${score} < ${options.minScore})`,
+      );
     }
-    const warningCount = Number(audit.summary && audit.summary.warningCount || 0);
+    const warningCount = Number(
+      (audit.summary && audit.summary.warningCount) || 0,
+    );
     if (warningCount > options.maxWarnings) {
-      failures.push(`audit warnings too many (${warningCount} > ${options.maxWarnings})`);
+      failures.push(
+        `audit warnings too many (${warningCount} > ${options.maxWarnings})`,
+      );
     }
-    const diffCount = Number(audit.summary && audit.summary.diffCount || 0);
+    const diffCount = Number((audit.summary && audit.summary.diffCount) || 0);
     if (diffCount > options.maxDiffs) {
-      failures.push(`audit diffs too many (${diffCount} > ${options.maxDiffs})`);
+      failures.push(
+        `audit diffs too many (${diffCount} > ${options.maxDiffs})`,
+      );
     }
     const targetPath = audit.options && audit.options.targetPath;
     if (!targetPath) {
@@ -169,7 +195,7 @@ function evaluate(preflight, audit, summary, options) {
   if (!summary || typeof summary !== "object") {
     failures.push("aggregate summary report missing or invalid");
   } else {
-    const status = String(summary.trend && summary.trend.status || "");
+    const status = String((summary.trend && summary.trend.status) || "");
     if (status && status !== "healthy") {
       failures.push(`summary trend is not healthy (${status})`);
     }
@@ -185,12 +211,16 @@ function evaluate(preflight, audit, summary, options) {
 function run() {
   const options = parseArgs(process.argv.slice(2));
   const target = options.target ? resolveMaybeAbsolutePath(options.target) : "";
-  const contract = options.contract ? resolveMaybeAbsolutePath(options.contract) : "";
+  const contract = options.contract
+    ? resolveMaybeAbsolutePath(options.contract)
+    : "";
   const reportPaths = buildReportPaths(options);
   const targetKind =
     String(options.targetKind || "").trim() ||
     (target && String(target).toLowerCase().endsWith(".html") ? "html" : "");
-  const auditMode = String(options.auditMode || "").trim() || (targetKind === "html" ? "html-partial" : "web-strict");
+  const auditMode =
+    String(options.auditMode || "").trim() ||
+    (targetKind === "html" ? "html-partial" : "web-strict");
 
   if (!options.reportsOnly) {
     const isHtml = targetKind === "html" || auditMode === "html-partial";
@@ -199,14 +229,24 @@ function run() {
       // 若项目提供 ui-icon-registry.json，把 icon-like <img> 重写为 icon class。
       if (options.cacheKey && target) {
         const iconRewriteScript = path.join(SCRIPT_DIR, "ui-icon-rewrite.js");
-        runOrExit(`node "${iconRewriteScript}" --cacheKey=${options.cacheKey} --target="${target}"`);
+        runOrExit(
+          `node "${iconRewriteScript}" --cacheKey=${options.cacheKey} --target="${target}"`,
+        );
       }
 
       // 工具链 forbidden gate：Web 组件才执行（HTML 审计不适用）。
       if (target) {
-        const forbiddenScript = path.join(SCRIPT_DIR, "forbidden-markup-check.cjs");
+        const forbiddenScript = path.join(
+          SCRIPT_DIR,
+          "..",
+          "forbidden-markup-check.cjs",
+        );
         const ckArg = options.cacheKey ? ` --cacheKey=${options.cacheKey}` : "";
-        if (!runOrExit(`node "${forbiddenScript}" --file="${target}"${ckArg}`.trim())) {
+        if (
+          !runOrExit(
+            `node "${forbiddenScript}" --file="${target}"${ckArg}`.trim(),
+          )
+        ) {
           process.exit(FAIL_EXIT_CODE);
         }
       }
@@ -220,7 +260,9 @@ function run() {
       preflightArgs.push(`--contract=${contract}`);
     }
     const preflightScript = path.join(SCRIPT_DIR, "ui-preflight.js");
-    if (!runOrExit(`node "${preflightScript}" ${preflightArgs.join(" ")}`.trim())) {
+    if (
+      !runOrExit(`node "${preflightScript}" ${preflightArgs.join(" ")}`.trim())
+    ) {
       process.exit(FAIL_EXIT_CODE);
     }
 
@@ -231,13 +273,23 @@ function run() {
         const rawAbs = rawJsonPathFromCacheKey(options.cacheKey);
         if (rawAbs && fs.existsSync(rawAbs)) {
           const outDir = path.dirname(target);
-          const genScript = path.join(SCRIPT_DIR, "generate-icon-insets.cjs");
+          const genScript = path.join(
+            SCRIPT_DIR,
+            "..",
+            "generate-icon-insets.cjs",
+          );
           const ck = `${String(options.cacheKey).split("#")[0]}#${normalizeNodeId(String(options.cacheKey).split("#")[1])}`;
-          if (!runOrExit(`node "${genScript}" --raw="${rawAbs}" --out-dir="${outDir}" --cacheKey="${ck}"`.trim())) {
+          if (
+            !runOrExit(
+              `node "${genScript}" --raw="${rawAbs}" --out-dir="${outDir}" --cacheKey="${ck}"`.trim(),
+            )
+          ) {
             process.exit(FAIL_EXIT_CODE);
           }
         } else {
-          console.warn(`[ui-auto-acceptance] icon insets skipped（raw.json 缺失）：${rawAbs}`);
+          console.warn(
+            `[ui-auto-acceptance] icon insets skipped（raw.json 缺失）：${rawAbs}`,
+          );
         }
       }
     }

@@ -9,70 +9,25 @@ function runSmokeCrossProjectAndCursorInit(context) {
     path,
     root,
     expectThrow,
-    runInDir,
-    runCrossProjectE2E,
+    runInDir
   } = context;
 
-  // package files: should ship UI / cross-project scripts (explicit paths or scripts/*.js glob)
+  // package files: should ship core UI scripts (explicit paths or scripts/*.js glob)
   {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
     const files = Array.isArray(pkg.files) ? pkg.files : [];
-    const scriptGlobs = files.includes("scripts/*.js");
+    const scriptGlobs = files.includes("scripts/*.js") || files.includes("scripts/**/*.js");
     const requiredScripts = [
-      "scripts/ui-auto-acceptance.js",
-      "scripts/ui-preflight.js",
-      "scripts/ui-1to1-audit.js",
-      "scripts/ui-report-aggregate.js",
-      "scripts/cross-project-e2e.js",
+      "scripts/ui/ui-auto-acceptance.js",
+      "scripts/ui/ui-preflight.js",
+      "scripts/ui/ui-1to1-audit.js",
+      "scripts/ui/ui-report-aggregate.js"
     ];
     for (const rel of requiredScripts) {
       const listed = files.includes(rel) || scriptGlobs;
       assert.ok(listed, `package files should include ${rel} (or scripts/*.js)`);
       assert.ok(fs.existsSync(path.join(root, rel)), `expected script on disk: ${rel}`);
     }
-  }
-
-  // cross-project-e2e: should fail fast when target project is missing
-  {
-    const err = expectThrow(
-      () => runCrossProjectE2E("--target=src/components/Example.tsx --cacheKey=abc#1:2", root, {}),
-      "cross-project-e2e should reject missing --target-project"
-    );
-    assert.strictEqual(err.status, 2, "cross-project-e2e missing target-project should exit with code 2");
-  }
-
-  // cross-project-e2e: should fail fast when target path is missing in single mode
-  {
-    const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cross-target-project-"));
-    const err = expectThrow(
-      () => runCrossProjectE2E(`--target-project=${tempProject} --cacheKey=abc#1:2`, root, {}),
-      "cross-project-e2e should reject missing --target in single mode"
-    );
-    assert.strictEqual(err.status, 2, "cross-project-e2e missing target should exit with code 2");
-  }
-
-  // cross-project-e2e: should fail when batch-file payload is empty
-  {
-    const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cross-batch-empty-"));
-    const batchFilePath = path.join(tempProject, "batch.json");
-    fs.writeFileSync(batchFilePath, "[]\n", "utf8");
-    const err = expectThrow(
-      () => runCrossProjectE2E(`--target-project=${tempProject} --batch-file=${batchFilePath}`, root, {}),
-      "cross-project-e2e should reject empty batch-file payload"
-    );
-    assert.strictEqual(err.status, 2, "cross-project-e2e empty batch-file should exit with code 2");
-  }
-
-  // cross-project-e2e: should fail when single-mode target path does not exist
-  {
-    const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "figma-cache-smoke-cross-target-missing-file-"));
-    const missingTarget = path.join(tempProject, "src", "components", "MissingComponent.vue");
-    const err = expectThrow(
-      () =>
-        runCrossProjectE2E(`--target-project=${tempProject} --cacheKey=abc#1:2 --target=${missingTarget}`, root, {}),
-      "cross-project-e2e should reject non-existing target file in single mode"
-    );
-    assert.strictEqual(err.status, 2, "cross-project-e2e missing target file should exit with code 2");
   }
 
   // cursor init: should ensure figma-cache.config.js and cleanup safe legacy example

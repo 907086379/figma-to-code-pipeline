@@ -70,7 +70,6 @@ npm run fc:config
 - `npm run fc:ui:audit -- --min-score=85`
 - `npm run fc:ui:report:aggregate`
 - `npm run fc:ui:accept -- --target=<componentPath>`
-- `npm run fc:ui:e2e:cross -- --target-project=../vue-demo --fileKey=<fileKey> --nodeId=<nodeId> --target=./src/pages/main/components/<YourComponent>/index.vue`（路径均相对于各自根目录；`../vue-demo` 表示与 toolchain 并列）
 - `npm run fc:ui:gate`
 - `npm run fc:ui:gate:pr`
 - `npm run fc:ui:gate:main`

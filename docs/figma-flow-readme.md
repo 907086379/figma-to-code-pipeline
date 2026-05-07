@@ -24,13 +24,14 @@ npm run fc:flow:mermaid -- --flow=<flowId>
 ## 已从 Figma 写入缓存的节点（以下由 postEnsure 增量维护）
 
 <!-- figma-cache-flow-readme: registry -->
+<!-- 工具链仓库默认不提交 `figma-cache/files/`；业务项目接入 `fc:ensure` / postEnsure 后在此追加节点节。 -->
 <!-- cache-node:abcABCd0123456789vWxyZ#1:2 -->
 ### `abcABCd0123456789vWxyZ#1:2`
 
 - **Figma**: https://www.figma.com/file/abcABCd0123456789vWxyZ/?node-id=1%3A2
-- **syncedAt**: 2026-04-20T05:50:52.169Z
+- **syncedAt**: 2026-05-07T03:23:53.335Z
 - **source**: figma-mcp
-- **completeness**: layout, text, tokens
-- **spec**: `C:/Users/90708/AppData/Local/Temp/figma-cache-smoke-upsert-ok-NXLPh7/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/spec.md` · **meta**: `C:/Users/90708/AppData/Local/Temp/figma-cache-smoke-upsert-ok-NXLPh7/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/meta.json`
+- **completeness**: layout, text, tokens, interactions, states, accessibility
+- **spec**: `C:/Users/90708/AppData/Local/Temp/fc-mcp-ingest-UP6RNk/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/spec.md` · **meta**: `C:/Users/90708/AppData/Local/Temp/fc-mcp-ingest-UP6RNk/figma-cache/files/abcABCd0123456789vWxyZ/nodes/1-2/meta.json`
 - **提示**: 像素级还原以 `spec.md` / `raw.json` 为准；用户路径请维护 `flows` 后把 `npm run fc:flow:mermaid` 输出贴到下方「流程总览」。
 

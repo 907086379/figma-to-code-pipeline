@@ -2,6 +2,72 @@
 
 该目录集中管理 Figma 缓存流程（脚本、索引、规范、样例缓存）。
 
+## 一页速查（默认先读本节）
+
+人类同事：**日常协作优先读本节**；命令全集、环境变量、UI gate、`flow` 等见下文。
+
+### 日常三步
+
+1. 把 Figma 链接和目标发给 Agent（是否强制刷新写清楚）。
+2. 有流程关系时写明前后页 / 分支 / 跳转。
+3. 确认回报含：缓存状态、来源、MCP 调用次数、输出文件（或 `fc:mcp:ingest` 退出码）。
+
+### 默认执行链
+
+先查本地缓存 → 按需 MCP → **`mcp-raw/`** 落盘：**`npm run fc:mcp:ingest:quiet` 一条龙**（`ensure` → `validate` → `fc:budget --mcp-only`）。派生物刷新在同一命令加 **`--enrich`**。**不要**把「再跑一遍 `fc:mcp:gate`」当默认步骤（与 ingest 尾部重复）。
+
+### MCP 回包落盘（`fc:mcp:ingest`）
+
+在 Cursor 等环境调用 MCP 拿到三段原始文本后，保存为文件或使用 stdin JSON，再执行：
+
+```bash
+npm run fc:mcp:ingest:quiet -- --url="<含 node-id 的 Figma 链接>" \
+  --design-context-file=tmp/mcp-raw-get-design-context.txt \
+  --metadata-file=tmp/mcp-raw-get-metadata.xml \
+  --variable-defs-file=tmp/mcp-raw-get-variable-defs.json
+```
+
+（等价于 `npm run fc:mcp:ingest -- --quiet ...`；需要完整 JSON 明细时用 `fc:mcp:ingest` 且不加 `--quiet`。）
+
+也可用 **`--stdin`** 从管道读 JSON（键名含 `get_design_context` / `get_metadata` / `get_variable_defs`）。
+
+默认行为：写入约定文件名、`mcp-raw-manifest.json`（sha256 / size / toolCalls），并串联 **`fc:ensure --source=figma-mcp`** → **`fc:validate`** → **`fc:budget --mcp-only`**。成功路径推荐 **`npm run fc:mcp:ingest:quiet`**（内置 `--quiet`，末行仅摘要）。需要刷新派生物时在**同一条命令**上加 **`--enrich`**。可用 **`--skip-budget`** 跳过 budget（少见）。完整选项：`npm run fc:mcp:ingest -- --help`。
+
+### `fc:mcp:gate`（仅修补场景）
+
+走 **`fc:mcp:ingest` 时不必再跑 gate**。仅在 **手工改了磁盘上的 `mcp-raw/`、未执行 ingest** 时，用 gate 做全索引 **`validate` + `fc:budget --mcp-only`**；需要 **`enrich --all`** 时用 `npm run fc:mcp:gate -- --enrich`。详见 `npm run fc:mcp:gate -- --help`。
+
+### 三条红线
+
+- `ensure` 不是 MCP 拉取器。
+- `source=figma-mcp` 但没有 `mcp-raw/` 证据，不算完成。
+- `upsert` / `ensure` 后 `validate` 未通过，不算完成。
+
+### completeness 与 flow（记忆法）
+
+- 默认：`layout,text,tokens,interactions,states,accessibility`
+- `flow` 仅在关系关键词或多链接串联意图时自动追加
+- 仅视觉微调 / 单链接无关系 / 仅资产导出：通常不自动补 `flow`
+
+### 主提示词（可复制）
+
+```text
+请按项目 figma 缓存规则处理下面链接：先查本地缓存，未命中或字段不足再按需调用 figma-mcp；三段回包只用 npm run fc:mcp:ingest:quiet 落盘（已含 ensure、validate、budget；派生物加 --enrich）。请回报缓存状态、来源、MCP 调用次数、fc:mcp:ingest 退出码、输出文件清单；若自动补 flow，请说明触发原因。
+
+[Figma 链接]
+```
+
+### 排障常用命令
+
+```bash
+npm run fc:config
+npm run fc:get -- "<figma-url>"
+npm run fc:validate
+npm run fc:budget
+```
+
+---
+
 ## 从 npm 包接入业务项目（顺序一览）
 
 若通过 **`figma-to-code-pipeline`** 安装（而非整仓拷贝本目录），推荐顺序为：
@@ -13,22 +79,21 @@
 
 说明：**`cursor init`** 与 **`figma-cache init`** 是两件事；后者才是本地缓存数据目录与空索引。仓库根 **`README.md`**（npm 包首页文档）中有与上述一致的「四步」说明。
 
-团队向长文（可转发同事）：**`colleague-guide-zh.md`**。`quick-start-zh.md` 可作新人一页式速查入口。
+**文档分工**：**本文件**为随包分发的**唯一主手册**（含 **一页速查** 与下文命令全集）。**`colleague-guide-zh.md`** 为团队可转发摘要（术语表、首次接入、升级）。**`quick-start-zh.md`** 仅保留兼容书签，指向本文件「一页速查」。
 
-## 使用方式（重要）
+## 使用方式（与「一页速查」的关系）
 
-- 日常只需要把 Figma 链接发给 agent。
-- agent 会自动完成：缓存查询 -> 必要时调用 MCP -> 回写缓存 -> 校验。
-- 你不需要手动执行命令，命令主要用于排障和迁移验证。
+- **人类**：日常只需把 Figma 链接发给 Agent；命令多用于排障。口径以 **一页速查** 为准。
+- **Agent**：行为以 `.cursor/rules` 与 Skill 为准；落盘默认 **`npm run fc:mcp:ingest:quiet`** 一条龙（`ensure` → `validate` → `budget`；派生物加 **`--enrich`**），**不必再单独跑 gate**。
 
 ## 目录结构
 
 - `figma-cache/figma-cache.js`：缓存流程脚本主入口
 - `figma-cache/index.json`：全量索引
 - `figma-cache/files/...`：节点缓存内容
-- **`figma-cache/docs/README.md`**：接入、scripts、环境变量、人工校验与回填（本文件，随包分发的主文档）
-- **`figma-cache/docs/colleague-guide-zh.md`**：团队向说明与提示词模板；**`npx figma-cache cursor init` 会写入/刷新**（与 `FIGMA_CACHE_DIR` 下路径一致），便于纳入版本库、不必从 `node_modules` 手抄
-- `figma-cache/docs/quick-start-zh.md`：一页式同事速查卡（建议新人先读）
+- **`figma-cache/docs/README.md`**：接入、一页速查、scripts、环境变量、人工校验与回填（本文件，随包分发的主文档）
+- **`figma-cache/docs/colleague-guide-zh.md`**：团队向摘要（术语、首次接入）；**`npx figma-cache cursor init` 会写入/刷新**（与 `FIGMA_CACHE_DIR` 下路径一致）
+- **`figma-cache/docs/quick-start-zh.md`**：兼容旧链接，内容已并入本文件「一页速查」
 - `figma-cache/docs/link-normalization-spec.md`：链接标准化规则（Core / Skill 会引用）
 - `figma-cache/docs/flow-edge-taxonomy.md`：流程边类型约定
 
@@ -56,6 +121,9 @@ npm run fc:config
 ## 常用命令（通常由 agent 自动执行）
 
 - `npm run fc:init`
+- **`npm run fc:mcp:ingest:quiet`**（推荐）：同上，且默认 **`--quiet`** 单行摘要；等价于 **`npm run fc:mcp:ingest -- --quiet`**
+- **`npm run fc:mcp:ingest`**：需要脚本首部 JSON 明细（manifest 摘要）时不加 `--quiet`
+- **`npm run fc:mcp:gate`**：仅**未跑 ingest**、手工改了 `mcp-raw` 等修补场景下，做全量 `validate` + `budget`；可选 **`--enrich`** 为 `enrich --all`；见上文「一页速查」→「`fc:mcp:gate`」
 - `npm run fc:get -- "<figma-url>"`
 - `npm run fc:ensure -- "<figma-url>" --source=manual --completeness=layout,text,tokens,interactions,states,accessibility`
 - `npm run fc:upsert -- "<figma-url>" --source=figma-mcp --completeness=layout,text,tokens,interactions,states,accessibility`
@@ -78,7 +146,7 @@ npm run fc:config
 - `npm run fc:backfill`
 > 注意：`ensure` 默认职责是“写索引 + 生成骨架文件”，不是 MCP 拉取器。  
 > 当 `upsert/ensure` 传 `--source=figma-mcp` 且未显式允许骨架模式时，CLI 会先执行 MCP 原始证据门禁（缺失即失败，退出码 2）。
-> 正确流程是先由 Agent/Figma MCP 获取最小调用集并写入 `mcp-raw/`，再执行 `upsert/ensure` 与 `validate`。
+> 正确流程是先由 Agent/Figma MCP 获取最小调用集并写入 `mcp-raw/`（推荐 **`fc:mcp:ingest:quiet`** / **`fc:mcp:ingest`**，已含 `validate` 与 `budget`）。**`fc:mcp:gate`** 仅用于未走 ingest 的修补（见上文「一页速查」）。
 
 ### Fresh 重生成回归（推荐）
 

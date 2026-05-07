@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 4.1.0（2026-05-07）
+
+- **仓库卫生**：`.gitignore` 默认忽略 `figma-cache/files/` 与 `figma-cache/mobile-specs/`；移除已入库的示例节点与 mobile-spec；`figma-cache/index.json` 重置为空索引；`docs/figma-flow-readme.md` 登记区不与本地缓存路径绑定。
+- **`fc:mcp:ingest` / `--quiet`**：MCP 三段回包落盘并串联 ensure / validate / budget；成功静默模式下末行仅输出 `fc:mcp:ingest ok <cacheKey> mcp-raw=...`；新增 **`fc:mcp:ingest:quiet`**、**`fc:mcp:gate`**；规则与 Skill 默认指向安静 ingest。
+- **文档**：`figma-cache/docs/README.md` **「一页速查」** 为主入口；`quick-start-zh` / `colleague-guide-zh` 与根文档引用已对齐。
+
 ## 4.0.0（2026-04-21）
 
 - **Breaking：scripts 目录分层**：`scripts/*` 调整为 `scripts/ui/*`、`scripts/workflow/*`、`scripts/verify/*` 三层；npm scripts 与测试用例已同步更新。

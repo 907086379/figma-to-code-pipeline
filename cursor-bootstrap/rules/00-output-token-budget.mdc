@@ -20,6 +20,11 @@ alwaysApply: true
 ## 失败反馈格式（强制）
 - 固定三段：失败原因 / 定位信息 / 修复动作。
 
+## Agent 执行 MCP 落盘 / `fc:mcp:ingest`（强制）
+- **对话区**：禁止逐步复述「Thought」、禁止罗列 staging 临时文件名（如 `dc-a.txt`）；优先 **单次** `--stdin` JSON 或一次性终端落盘，避免多轮 `Write` 制造冗长 diff。
+- **终端**：成功路径使用 **`npm run fc:mcp:ingest:quiet`**（或 **`npm run fc:mcp:ingest -- ... --quiet`** / `--quiet --enrich`），抑制 ensure/validate/budget/enrich 的 JSON **标准输出**；脚本结束时仅一行 `fc:mcp:ingest ok <cacheKey> mcp-raw=...`。
+- **禁止**在聊天里粘贴完整 budget 报表或 manifest；失败时再按三段式简短说明。
+
 ## 例外
 - 用户明确要求“完整输出/日志/原文”时可放宽上述限制。
 

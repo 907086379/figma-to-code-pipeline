@@ -2,48 +2,7 @@
   "schemaVersion": 2,
   "version": 1,
   "normalizationVersion": 1,
-  "updatedAt": "2026-04-15T08:17:41.125Z",
-  "flows": {
-    "test-flow": {
-      "id": "test-flow",
-      "title": "test-flow",
-      "description": "",
-      "createdAt": "2026-04-15T07:43:00.577Z",
-      "updatedAt": "2026-04-15T07:43:00.577Z",
-      "nodes": [
-        "53hw0wDvgOzH14DXSsnEmE#9277:29768"
-      ],
-      "edges": [],
-      "assumptions": [],
-      "openQuestions": []
-    }
-  },
-  "items": {
-    "53hw0wDvgOzH14DXSsnEmE#9277:29768": {
-      "fileKey": "53hw0wDvgOzH14DXSsnEmE",
-      "nodeId": "9277:29768",
-      "scope": "node",
-      "url": "https://www.figma.com/file/53hw0wDvgOzH14DXSsnEmE/?node-id=9277%3A29768",
-      "originalUrls": [
-        "https://www.figma.com/file/53hw0wDvgOzH14DXSsnEmE/?node-id=9277-29768"
-      ],
-      "normalizationVersion": 1,
-      "paths": {
-        "meta": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/meta.json",
-        "spec": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/spec.md",
-        "stateMap": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/state-map.md",
-        "raw": "figma-cache/files/53hw0wDvgOzH14DXSsnEmE/nodes/9277-29768/raw.json"
-      },
-      "syncedAt": "2026-04-15T08:17:41.125Z",
-      "completeness": [
-        "layout",
-        "text",
-        "tokens",
-        "interactions",
-        "states",
-        "accessibility"
-      ],
-      "source": "manual"
-    }
-  }
+  "updatedAt": null,
+  "flows": {},
+  "items": {}
 }

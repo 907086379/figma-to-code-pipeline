@@ -219,6 +219,11 @@ function normalizeUiFacts(input) {
     JSON.stringify(rawJson || {}),
   ];
 
+  const inf =
+    rawJson.interactionInference && typeof rawJson.interactionInference === "object"
+      ? rawJson.interactionInference
+      : null;
+
   return {
     dimensions: {
       layoutReady: !!(payload.entryReady && payload.evidenceReady),
@@ -226,6 +231,8 @@ function normalizeUiFacts(input) {
       tokenReady: tokenFacts.length > 0,
       stateReady: stateFacts.length > 0,
       interactionReady: interactionFacts.interactionFacts.length > 0 || interactionFacts.notes.length > 0,
+      /** MCP hydrate 写入的交互归类（启发式），勿当实证维度计数 */
+      interactionInferencePresent: !!inf,
     },
     facts: {
       text: specFacts.textFacts,
@@ -233,6 +240,8 @@ function normalizeUiFacts(input) {
       states: stateFacts,
       interactions: interactionFacts.interactionFacts,
       notes: interactionFacts.notes,
+      interactionInferenceProfile: inf && inf.profile ? String(inf.profile) : null,
+      interactionInferenceMethod: inf && inf.method ? String(inf.method) : null,
     },
     hasPlaceholder: placeholderSources.some((source) => isPlaceholderText(source)),
   };

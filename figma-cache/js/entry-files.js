@@ -230,7 +230,90 @@ function createEntryFilesService(deps) {
       .map(([key, value]) => `- ${key}: ${String(value)}`);
   }
 
-  function buildMcpHydratedSpecContent(item, evidence) {
+  /**
+   * 基于 MCP 证据做 UI 交互模式的启发式归类，避免所有节点落同一套「下拉/设备」叙事。
+   * 推断失败时回落到 generic，由人工补全。
+   */
+  function buildInteractionInferenceRecord(profile) {
+    const p = profile && typeof profile === "object" ? profile : { kind: "generic", hints: {} };
+    return {
+      schemaVersion: 1,
+      profile: p.kind,
+      method: "design_context_metadata_heuristic_v1",
+      signals: p.hints && typeof p.hints === "object" ? p.hints : {},
+      disclaimer:
+        "本条为工具链规则推断，不等价于设计交互原型或组件类型声明；Agent 与数据统计勿单独以此为结论，须核对 mcp-raw-get-design-context.txt 与设计稿。",
+    };
+  }
+
+  function inferInteractionProfile(evidence) {
+    const dc = String(evidence?.designContextText || "");
+    const meta = String(evidence?.metadataText || "");
+    const hay = `${dc}\n${meta}`;
+    const low = hay.toLowerCase();
+
+    let selectSignals = 0;
+    if (/\b(select|listbox|combobox|dropdown)\b/i.test(dc)) selectSignals += 1;
+    if (/chevron|caret-down|expand_more|arrow_drop_down/i.test(low)) selectSignals += 1;
+    if (/data-name="[^"]*(select|dropdown|listbox)/i.test(dc)) selectSignals += 1;
+    if (/\b(option|menuitem)\b/i.test(dc) && /list|menu|popover|dropdown/i.test(low)) selectSignals += 1;
+
+    const inputFieldMarkers = (dc.match(/data-name="Input field"/gi) || []).length;
+    const hasNativeInput = /<input\b/i.test(dc);
+    const hasTextArea = /<textarea\b/i.test(dc);
+    const inputLike =
+      inputFieldMarkers > 0 ||
+      hasNativeInput ||
+      hasTextArea ||
+      /type="(text|password|email|search|tel|url|number)"/i.test(dc);
+
+    const hasButton =
+      /data-name="Button"/i.test(dc) ||
+      /<button\b/i.test(dc) ||
+      /role="button"/i.test(dc);
+
+    const hasPasswordAffordance =
+      /data-name="[^"]*eye/i.test(dc) ||
+      /eye-slash|visibility_off|password-toggle|show.*password/i.test(low);
+
+    const strongSelect =
+      selectSignals >= 2 || (selectSignals >= 1 && /chevron|arrow_drop|expand_more/i.test(low));
+
+    if (strongSelect) {
+      return {
+        kind: "selectLike",
+        hints: { selectSignals, inputFieldMarkers },
+      };
+    }
+
+    if (inputLike && hasButton) {
+      return {
+        kind: "formInputs",
+        hints: { inputFieldMarkers, hasPasswordAffordance },
+      };
+    }
+
+    if (inputLike) {
+      return {
+        kind: "formInputs",
+        hints: { inputFieldMarkers, hasPasswordAffordance },
+      };
+    }
+
+    if (hasButton) {
+      return {
+        kind: "buttonPrimary",
+        hints: {},
+      };
+    }
+
+    return {
+      kind: "generic",
+      hints: {},
+    };
+  }
+
+  function buildMcpHydratedSpecContent(item, evidence, profileMaybe) {
     const completeness = normalizeCompletenessList(item.completeness);
     const layout = extractLayoutSummary(evidence.metadataText, item.nodeId || "N/A");
     const textItems = extractTextCandidates(evidence.designContextText);
@@ -242,6 +325,28 @@ function createEntryFilesService(deps) {
       ? tokenItems.join("\n")
       : "- 未从 get_variable_defs 中提取到 token，建议人工补充。";
 
+    const profile = profileMaybe || inferInteractionProfile(evidence);
+    let interactionsLine;
+    let statesLine;
+    let a11yLine;
+    if (profile.kind === "selectLike") {
+      interactionsLine = `- get_design_context 启发式推断（非交互实证）：可能与「选择器 + 下拉/列表」类一致；展开、收起与选项选择须以稿与真实行为校验。`;
+      statesLine = `- 推断状态草稿：default、expanded、selected（选项）、unselected（实现前请校对）。`;
+      a11yLine = `- 若确为列表选择：可考虑 label + combobox/listbox；键盘可达与当前值读出以无障碍规范为准。`;
+    } else if (profile.kind === "formInputs") {
+      interactionsLine = `- get_design_context 启发式推断（非交互实证）：可能与「表单输入 + 主操作」一致；聚焦、输入、提交以产品与稿为准。`;
+      statesLine = `- 推断状态草稿：default、focus、filled；错误态与禁用态以稿为准。`;
+      a11yLine = `- 建议：label 与控件关联、错误提示可达、合理 Tab 顺序与焦点可见性。`;
+    } else if (profile.kind === "buttonPrimary") {
+      interactionsLine = `- get_design_context 启发式推断（非交互实证）：可能与「以按钮为主」的点击交互一致；请以稿校验。`;
+      statesLine = `- 推断状态草稿：default、hover、active、disabled（以稿为准）。`;
+      a11yLine = `- 建议：按钮具备可读名称；禁用态对辅助技术可用 aria-disabled。`;
+    } else {
+      interactionsLine = `- get_design_context 未能自动归类交互模式；以下章节请勿当作交付事实，请对照稿补充。`;
+      statesLine = `- 状态矩阵请以设计稿与产品说明为准。`;
+      a11yLine = `- 请依据实际组件类型补充无障碍约束。`;
+    }
+
     return (
       `# Figma Spec\n\n` +
       `- fileKey: ${item.fileKey}\n` +
@@ -249,7 +354,9 @@ function createEntryFilesService(deps) {
       `- nodeId: ${item.nodeId || "N/A"}\n` +
       `- source: ${item.source}\n` +
       `- syncedAt: ${item.syncedAt}\n` +
-      `- completeness: ${completeness.join(", ") || "N/A"}\n\n` +
+      `- completeness: ${completeness.join(", ") || "N/A"}\n` +
+      `- interactionProfile: ${profile.kind}（启发式）\n` +
+      `- interactionInferenceDisclaimer: 下文 Interactions/States 为自动化草稿，非设计结论；交互实证以 mcp-raw-get-design-context.txt 为准；详见 raw.json.interactionInference。\n\n` +
       `## Layout（结构）\n\n` +
       `- node: ${layout.name} (${layout.id})\n` +
       `- position: ${layout.pos}\n` +
@@ -259,38 +366,118 @@ function createEntryFilesService(deps) {
       `## Tokens（变量 / 样式）\n\n` +
       `${tokenSection}\n\n` +
       `## Interactions（交互）\n\n` +
-      `- 证据来源：get_design_context。可识别为输入选择器 + 下拉列表交互，包含展开/收起与选项选择行为。\n\n` +
+      `${interactionsLine}\n\n` +
       `## States（状态）\n\n` +
-      `- 可识别状态：default、expanded、selected（下拉项）、unselected。\n\n` +
+      `${statesLine}\n\n` +
       `## Accessibility（可访问性）\n\n` +
-      `- 建议语义：label + combobox/listbox，并保证键盘可达与选中值可读出。\n`
+      `${a11yLine}\n`
     );
   }
 
-  function buildMcpHydratedStateMapContent(item) {
-    return (
+  function buildMcpHydratedStateMapContent(item, evidence, profileMaybe) {
+    const layout = extractLayoutSummary(evidence.metadataText, item.nodeId || "N/A");
+    const profile = profileMaybe || inferInteractionProfile(evidence);
+    const completeness = normalizeCompletenessList(item.completeness).join(", ") || "N/A";
+
+    const header =
       `# State Map\n\n` +
       `- cacheKey: ${item.fileKey}#${item.nodeId || "__FILE__"}\n` +
-      `- completeness: ${normalizeCompletenessList(item.completeness).join(", ") || "N/A"}\n\n` +
+      `- completeness: ${completeness}\n` +
+      `- interactionProfile: ${profile.kind}（启发式推断，来源：get_design_context / get_metadata；若与稿不符请修订）\n` +
+      `- nodeName: ${layout.name}\n` +
+      `- disclaimer: 下表为推断草稿，非统计意义上的「设计状态全集」；跨节点汇总前请读 raw.json.interactionInference 或人工校对。\n\n`;
+
+    if (profile.kind === "selectLike") {
+      return (
+        header +
+        `## Interactions\n\n` +
+        `| Trigger | From | To | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| click selector | default | expanded | 展开选项列表 |\n` +
+        `| click option | expanded | selected | 切换当前选项并关闭列表 |\n` +
+        `| outside click / esc | expanded | default | 收起列表 |\n\n` +
+        `## States\n\n` +
+        `| State | Visual | Data | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| default | 选择器展示当前值 | currentValue=lastSelected | 初始态 |\n` +
+        `| expanded | 展示下拉或浮层面板 | listOpen=true | 可选 list |\n` +
+        `| selected | 当前项强调（勾选/高亮） | selectedId=optionId | 当前项 |\n` +
+        `| unselected | 非当前项样式 | selectedId!=optionId | 其他项 |\n\n` +
+        `## Accessibility\n\n` +
+        `- role 建议：combobox + listbox + option；支持 Tab/Enter/Escape/Arrow 键导航。\n`
+      );
+    }
+
+    if (profile.kind === "formInputs") {
+      const pwd = !!(profile.hints && profile.hints.hasPasswordAffordance);
+      const visibilityRow = pwd
+        ? `| click visibility control | passwordHidden | passwordShown | 切换密码明文/遮蔽（稿中含显隐控件时） |\n`
+        : "";
+      const pwdStateRows = pwd
+        ? `| passwordShown | 明文展示密码 | reveal=true | 显隐开启 |\n` +
+          `| passwordHidden | 遮蔽展示密码 | reveal=false | 默认 |\n`
+        : "";
+
+      return (
+        header +
+        `## Interactions\n\n` +
+        `| Trigger | From | To | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| focus field | default | focus | 文本输入获得焦点 |\n` +
+        `| input | focus | filled | 输入内容更新 |\n` +
+        `| blur | focus | default | 失焦恢复常态样式 |\n` +
+        visibilityRow +
+        `| primary action | filled | default | 主按钮或下一步（依产品流程） |\n\n` +
+        `## States\n\n` +
+        `| State | Visual | Data | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| default | 占位符或空值 | value="" | 初始 |\n` +
+        `| focus | 焦点环或边框强调 | focusedField=id | 键盘可达 |\n` +
+        `| filled | 用户输入后的展示 | value.length>0 | 可触发校验 |\n` +
+        pwdStateRows +
+        `| disabled | 控件禁用样式 | disabled=true | 若稿中存在 |\n\n` +
+        `## Accessibility\n\n` +
+        `- 建议：label 与控件关联；错误提示可读；密码字段策略按稿与产品规范。\n`
+      );
+    }
+
+    if (profile.kind === "buttonPrimary") {
+      return (
+        header +
+        `## Interactions\n\n` +
+        `| Trigger | From | To | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| pointer down | default | active | 按下 |\n` +
+        `| pointer up | active | default | 松开 |\n` +
+        `| click | default | — | 触发主操作 |\n\n` +
+        `## States\n\n` +
+        `| State | Visual | Data | Notes |\n` +
+        `| --- | --- | --- | --- |\n` +
+        `| default | 常态 | idle | 初始 |\n` +
+        `| hover | 悬停强调 | hover=true | 若稿含 |\n` +
+        `| active | 按下态 | pressed=true | 瞬态 |\n` +
+        `| disabled | 禁用样式 | disabled=true | 若稿含 |\n\n` +
+        `## Accessibility\n\n` +
+        `- 建议：具备可读名称；禁用态对辅助技术暴露 disabled 语义。\n`
+      );
+    }
+
+    return (
+      header +
       `## Interactions\n\n` +
       `| Trigger | From | To | Notes |\n` +
       `| --- | --- | --- | --- |\n` +
-      `| click selector | default | expanded | 展开设备列表 |\n` +
-      `| click option | expanded | selected | 切换当前设备并关闭列表 |\n` +
-      `| outside click / esc | expanded | default | 收起列表 |\n\n` +
+      `| （未自动识别固定模式） | default | default | 请对照设计稿补充触发器与状态流转 |\n\n` +
       `## States\n\n` +
       `| State | Visual | Data | Notes |\n` +
       `| --- | --- | --- | --- |\n` +
-      `| default | 输入框显示当前值 | currentDevice=lastSelected | 初始态 |\n` +
-      `| expanded | 展示下拉列表 | listOpen=true | 可选择设备 |\n` +
-      `| selected | 文本高亮+勾选图标 | selectedId=optionId | 当前项 |\n` +
-      `| unselected | 常规文本样式 | selectedId!=optionId | 非当前项 |\n\n` +
+      `| default | 稿面初始呈现 | — | 作为还原基线 |\n\n` +
       `## Accessibility\n\n` +
-      `- role 建议：combobox + listbox + option；支持 Tab/Enter/Escape/Arrow 键导航。\n`
+      `- 请依据组件类型补充 role、键盘操作与读屏文案。\n`
     );
   }
 
-  function hydrateRawTodoNotesIfNeeded(item, evidence) {
+  function hydrateRawTodoNotesIfNeeded(item, evidence, profileMaybe) {
     const rawAbs = resolveMaybeAbsolutePath(item.paths.raw);
     const raw = safeReadJson(rawAbs);
     if (!raw || typeof raw !== "object") {
@@ -298,19 +485,55 @@ function createEntryFilesService(deps) {
     }
     let changed = false;
     const designHint = evidence && evidence.designContextText ? "（来源：get_design_context）" : "";
+    const profile =
+      profileMaybe ||
+      (evidence && typeof evidence === "object"
+        ? inferInteractionProfile(evidence)
+        : { kind: "generic", hints: {} });
+
     if (raw.interactions && isPlaceholderText(raw.interactions.notes)) {
-      raw.interactions.notes =
-        `节点包含选择器与下拉列表交互，至少应覆盖展开、选择、收起三类行为${designHint}。`;
+      if (profile.kind === "selectLike") {
+        raw.interactions.notes =
+          `【推断草稿】若为列表类选择器，常见须覆盖展开、选择、收起；若稿面不符请改写本条${designHint}。`;
+      } else if (profile.kind === "formInputs") {
+        raw.interactions.notes =
+          `【推断草稿】若为表单区，常见涉及聚焦、输入、失焦与主操作；若稿面不符请改写本条${designHint}。`;
+      } else if (profile.kind === "buttonPrimary") {
+        raw.interactions.notes =
+          `【推断草稿】若以按钮为主，常见涉及点击、悬停、按下与禁用；若稿面不符请改写本条${designHint}。`;
+      } else {
+        raw.interactions.notes = `请对照设计稿补充交互规则${designHint}。`;
+      }
       changed = true;
     }
     if (raw.states && isPlaceholderText(raw.states.notes)) {
-      raw.states.notes =
-        `状态建议覆盖 default / expanded / selected / unselected，并维护当前选项同步。`;
+      if (profile.kind === "selectLike") {
+        raw.states.notes =
+          `【推断草稿】列表类常见状态包含 default/expanded/selected/unselected；请以稿与交互说明为准。`;
+      } else if (profile.kind === "formInputs") {
+        raw.states.notes =
+          `【推断草稿】表单常见涉及 default/focus/filled 与错误/禁用；请以稿为准。`;
+      } else if (profile.kind === "buttonPrimary") {
+        raw.states.notes =
+          `【推断草稿】按钮常见涉及 default/hover/active/disabled；请以稿面为准。`;
+      } else {
+        raw.states.notes = `请对照设计稿补充状态矩阵。`;
+      }
       changed = true;
     }
     if (raw.accessibility && isPlaceholderText(raw.accessibility.notes)) {
-      raw.accessibility.notes =
-        `建议采用 combobox/listbox 语义，提供键盘导航和读屏可感知的当前值。`;
+      if (profile.kind === "selectLike") {
+        raw.accessibility.notes =
+          `建议采用 combobox/listbox 语义，提供键盘导航和读屏可感知的当前值。`;
+      } else if (profile.kind === "formInputs") {
+        raw.accessibility.notes =
+          `建议为表单控件补充 label 关联、错误提示可读性与键盘遍历顺序。`;
+      } else if (profile.kind === "buttonPrimary") {
+        raw.accessibility.notes =
+          `建议按钮具备清晰 accessible name，并保证焦点可见性。`;
+      } else {
+        raw.accessibility.notes = `请依据组件类型补充无障碍要求。`;
+      }
       changed = true;
     }
     if (changed) {
@@ -329,11 +552,12 @@ function createEntryFilesService(deps) {
 
     const specAbs = resolveMaybeAbsolutePath(item.paths.spec);
     const stateMapAbs = resolveMaybeAbsolutePath(item.paths.stateMap);
+    const profile = inferInteractionProfile(evidence);
     // Always refresh mcp-hydrated entry files to avoid stale evidence summaries
     // when completeness changes or when earlier runs wrote placeholder content.
-    fs.writeFileSync(specAbs, buildMcpHydratedSpecContent(item, evidence), "utf8");
-    fs.writeFileSync(stateMapAbs, buildMcpHydratedStateMapContent(item), "utf8");
-    hydrateRawTodoNotesIfNeeded(item, evidence);
+    fs.writeFileSync(specAbs, buildMcpHydratedSpecContent(item, evidence, profile), "utf8");
+    fs.writeFileSync(stateMapAbs, buildMcpHydratedStateMapContent(item, evidence, profile), "utf8");
+    hydrateRawTodoNotesIfNeeded(item, evidence, profile);
 
     // Persist machine-friendly icon metrics for 1:1 icon glyph sizing,
     // optional layoutMetrics from mcp-raw/figma-geometry-metrics.json (Figma Plugin API / bounding boxes),
@@ -351,6 +575,7 @@ function createEntryFilesService(deps) {
         rawAbs,
         () => JSON.parse(buildDefaultRawContent(item)),
         (next) => {
+          next.interactionInference = buildInteractionInferenceRecord(profile);
           next.iconMetrics = iconMetrics;
           mergeLayoutMetricsFromGeometry(next, geometry);
           const iconN = Array.isArray(next.iconMetrics) ? next.iconMetrics.length : 0;

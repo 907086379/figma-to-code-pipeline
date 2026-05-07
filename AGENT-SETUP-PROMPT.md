@@ -45,7 +45,7 @@
    - 若项目根**尚无** `figma-cache/index.json`，提示用户执行：`npm run fc:init`（若已加 script）或 `npx figma-cache init`（与 `cursor init` 不同，用于创建空索引与缓存目录）。
    - 提示用户在本项目根执行：`npm run fc:validate`（若已加 script）或 `npx figma-cache validate`。
    - 说明：后续 Figma 相关对话将主要由 **01 Core + 新 Adapter + figma-mcp-local-cache Skill** 驱动；涉及全局样式与组件生成稳定性时叠加 **04-ui-baseline-governance**。
-   - **可选**：若项目已通过 `cursor init` 同步 `figma-cache/docs/colleague-guide-zh.md`，提示团队默认只使用 **§5.1「最推荐主提示词」**，只有特殊诉求再追加 **§5.2** 的一句附加要求。
+   - **可选**：提示团队人类协作口径与主提示词以 **`figma-cache/docs/README.md`** **「一页速查」** 为准；术语表与可转发摘要见 **`figma-cache/docs/colleague-guide-zh.md`**。
 
 9. **UI 全局基线治理（强烈推荐，与 UI 实现任务绑定）**
    - 确认 `.cursor/rules/04-ui-baseline-governance.mdc` 已存在于项目根（随 `cursor init` 同步）；若缺失，从 npm 包内 `cursor-bootstrap/rules/` 补拷到当前仓库 `.cursor/`，并提示团队升级 **`figma-to-code-pipeline`** 版本以便后续 init 自带。
@@ -58,6 +58,7 @@
 - 默认“只要结果”：不输出思考过程，不粘贴 MCP 长回包。
 - 执行 Figma MCP 后，用户可见回复只保留：缓存状态、调用次数、产物路径、校验结论、失败修复动作。
 - 除非用户明确要求，禁止在 chat 中贴出 `get_design_context` 全文；原始内容仅保存到 `mcp-raw/*`。
+- MCP 三段回包落盘**只使用** **`npm run fc:mcp:ingest:quiet`**（或 **`npm run fc:mcp:ingest -- ... --quiet`** / 项目已配置的等价 script；已串联 ensure / validate / budget；派生物加 **`--enrich`**），参数与例外见 **`figma-cache/docs/README.md`** **「一页速查」** → **「MCP 回包落盘」**。未跑 ingest、仅改磁盘证据时再考虑 **`fc:mcp:gate`**（见同节 **「`fc:mcp:gate`」**）。
 
 ## 硬约束（违反则视为未完成）
 

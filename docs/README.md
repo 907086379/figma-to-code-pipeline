@@ -119,7 +119,7 @@ npm run fc:mobile:spec -- --url "<figma-url>" --platform all
 
 ## 5. 更多入口
 
-- **`figma-cache/docs/README.md`**：脚本全集、环境变量、Adapter、`postEnsure`、门禁与 UI 工具链。
-- **`figma-cache/docs/colleague-guide-zh.md`**：团队向长文与提示词模板。
-- **`figma-cache/docs/quick-start-zh.md`**：新人速查。
+- **`figma-cache/docs/README.md`**：脚本全集、**一页速查**（主提示词与 ingest）、环境变量、Adapter、`postEnsure`、门禁与 UI 工具链。
+- **`figma-cache/docs/colleague-guide-zh.md`**：团队向摘要（术语、首次接入）。
+- **`figma-cache/docs/quick-start-zh.md`**：兼容旧书签，正文已并入 **`figma-cache/docs/README.md`**「一页速查」。
 - **`AGENT-SETUP-PROMPT.md`**：接入任务书（`cursor init` 会刷新到业务项目根）。

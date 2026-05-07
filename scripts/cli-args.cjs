@@ -7,7 +7,7 @@
  *
  * 已接入（scripts 下）：forbidden-markup-check、ui-1to1-audit、cross-project-e2e、batch-add/remove、
  * generate-icon-insets(+batch)、archive-artifacts、ui-mount-batch、auto-link-related、apply-auto-related、
- * import-mcp-raw-evidence、repair-mcp-design-context-evidence、merge-figma-geometry-metrics、ui-icon-rewrite、
+ * mcp-raw-ingest、mcp-raw-gate、repair-mcp-design-context-evidence、merge-figma-geometry-metrics、ui-icon-rewrite、
  * ui-preflight、ui-report-aggregate、ui-auto-acceptance、check-ui-adapter-contract、ui-icon-registry-sync、
  * mobile/generate-mobile-spec。
  */

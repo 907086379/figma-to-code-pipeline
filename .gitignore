@@ -1,7 +1,51 @@
+# figma-to-code-pipeline（工具链仓库）
+# 原则：发布进 npm 的清单见 package.json "files"；此处忽略本地生成物、大体积缓存与机密。
+
+# --- 依赖与包产物 ---
 node_modules/
 *.tgz
-README.owner.md
-figma-cache/reports/runtime/*.json
-
-# pnpm / tooling residue (avoid search noise)
 node_modules/.ignored_figma-to-code-pipeline/
+
+# --- 构建与测试输出 ---
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+*.lcov
+
+# --- 日志与临时目录 ---
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.cache
+
+# --- 环境变量与机密（勿提交 token）---
+.env
+.env.*
+!.env.example
+
+# --- 仅本地说明（可能误被 npm 按 README* 规则打入包，见根 README）---
+README.owner.md
+
+# --- 可复现运行态报告（与 .cursorignore 一致）---
+figma-cache/reports/
+
+# --- 本地节点缓存（不入库；团队在各业务仓自行约定是否跟踪）---
+figma-cache/files/
+
+# --- 移动规格派生物（不入库）---
+figma-cache/mobile-specs/
+
+# --- 操作系统 ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- 编辑器 / IDE（按需裁剪）---
+.idea/
+*.suo
+*.user

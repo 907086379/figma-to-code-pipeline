@@ -18,6 +18,18 @@
       "description": "Peer cacheKeys linked via index.json flows (edge.type starts with \"related\", e.g. related_auto). Hydrate refresh overwrites from current index.",
       "items": { "type": "string" }
     },
+    "interactionInference": {
+      "type": "object",
+      "description": "Heuristic UI interaction profile from MCP hydrate (not proof of runtime behavior). Prefer this field over prose in spec/state-map for analytics filtering.",
+      "properties": {
+        "schemaVersion": { "type": "integer" },
+        "profile": { "type": "string" },
+        "method": { "type": "string" },
+        "signals": { "type": "object" },
+        "disclaimer": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "evidenceSummary": {
       "type": "object",
       "description": "Non-gating observability counts after hydrate (design context size, refs, geometry sidecar presence).",

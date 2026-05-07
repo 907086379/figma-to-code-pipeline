@@ -22,7 +22,7 @@ npm run fc:validate
 
 接入后请在 Cursor 中 **`@AGENT-SETUP-PROMPT.md`**（由 `cursor init` 刷新）。`cursor init` 还会落地 `figma-cache.config.js`、`AGENT-SETUP-PROMPT.md`，并把同事指南拷到 **`figma-cache/docs/colleague-guide-zh.md`**。
 
-**协作口径（极简）**：先查缓存 → 按需 MCP → **`mcp-raw/`** 落证据 → **`fc:upsert` / `fc:ensure`** → **`fc:validate`**。`source=figma-mcp` 时证据不全会失败，不能仅靠骨架宣称成功。提示词与日常约定见 **`figma-cache/docs/colleague-guide-zh.md`**。
+**协作口径（极简）**：先查缓存 → 按需 MCP → **`mcp-raw/`** 落证据 → **`npm run fc:mcp:ingest:quiet`** 一条龙（或等价 upsert/ensure + validate）。`source=figma-mcp` 时证据不全会失败。**人类默认只读一份**：**`figma-cache/docs/README.md`** **「一页速查」**；术语与可转发摘要见 **`figma-cache/docs/colleague-guide-zh.md`**。
 
 **脚本全集、环境变量、`flow`、UI gate、预算、示例命令**：见 **`figma-cache/docs/README.md`**（随 npm 包分发的主手册）。
 
@@ -57,9 +57,9 @@ npm run verify:docs && npm test
 | 场景 | 文件 |
 |------|------|
 | 升级 / 破坏性变更 | `CHANGELOG.md` |
-| 命令、环境变量、流程、UI 工具链（主手册） | `figma-cache/docs/README.md` |
-| 团队长文与提示词模板 | `figma-cache/docs/colleague-guide-zh.md` |
-| 新人 3 分钟 | `figma-cache/docs/quick-start-zh.md` |
+| 命令、一页速查、环境变量、流程、UI 工具链（主手册） | `figma-cache/docs/README.md` |
+| 团队摘要（术语、接入、转发） | `figma-cache/docs/colleague-guide-zh.md` |
+| 兼容旧书签（内容已并入主手册「一页速查」） | `figma-cache/docs/quick-start-zh.md` |
 | 链接 / flow 边类型规范 | `figma-cache/docs/link-normalization-spec.md`、`flow-edge-taxonomy.md` |
 | 接入任务书 | `AGENT-SETUP-PROMPT.md`（`cursor init` 刷新到业务根） |
 | 人读总览（治理、`figma-flow-readme`、移动端可选） | `docs/README.md`、`docs/figma-flow-readme.md` |

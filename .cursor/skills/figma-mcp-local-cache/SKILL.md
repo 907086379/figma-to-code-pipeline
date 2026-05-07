@@ -17,19 +17,20 @@ description: 将 Figma 链接信息沉淀到项目本地缓存并执行缓存优
    - `get_design_context`（`excludeScreenshot=true`）
    - `get_metadata`
    - `get_variable_defs`
-4. 原始回包写入 `mcp-raw/`，并写 `mcp-raw-manifest.json`（必须含 `files/fileHashes/fileSizes/toolCalls`）。
-5. 立即执行反精简检查（截断标记 + hash/size）并记录结果。
-6. 执行 `upsert/ensure` 后自动执行 `validate`；失败时自修复并循环到通过。
+4. **默认用脚本落盘（强制）**：拿到三段回包后 **只执行 `npm run fc:mcp:ingest:quiet`**（或 **`npm run fc:mcp:ingest -- ... --quiet`** / 项目已配置的等价 script；成功路径必 **quiet** 以减少终端与对话复盘体积；参数见 `figma-cache/docs/README.md` **「一页速查」**），一次性完成 `mcp-raw/*`、`mcp-raw-manifest.json`、`fc:ensure`、`fc:validate`、`fc:budget --mcp-only`；需要刷新派生物时对同一命令追加 **`--enrich`**。**禁止**再让用户加一句「跑 gate」类提示词。**禁止**默认在长对话里手写四个文件与哈希；**禁止**为落盘拆多段 `Write` staging 文件刷屏——优先 **`--stdin`** JSON 或本机终端一次性喂文件。
+5. 若 ingest 未跑或手工补盘：立即做反精简检查（截断标记 + hash/size）并确保 manifest 与文件一致。
+6. 若未通过 ingest 完成闭环：手动补跑 `fc:ensure --source=figma-mcp` / `fc:validate`，或 **`fc:mcp:gate`**（仅修补磁盘、未走 ingest 时的全量复核；与 ingest 不要重复执行）。
 
 ## 关键约束
 - 禁止同参数重复调用 MCP。
+- **`fc:mcp:ingest` 为 MCP 落盘默认路径**；与「手写 mcp-raw」二选一且以前者为默认。
 - `flow` 非默认维度，仅白名单触发时追加，并在回复说明原因。
 - 缓存任务默认不写业务 UI 代码。
 
 ## 用户可见输出（最小化）
 - 首行固定：
   - `> 🔄 Figma 缓存状态: [命中|缺失|更新] | 来源: [Local|MCP] | 节点: {nodeId}`
-- 仅补充：`mcp-raw anti-truncation`、MCP 调用统计、最终 completeness、文件清单、validate 结果。
+- 仅补充：`mcp-raw anti-truncation`、MCP 调用统计、最终 completeness、文件清单、**ingest 退出码（0 表示 ensure + validate + budget 已串联）**。
 - 除非用户明确要求，禁止贴 MCP 原文与长日志。
 
 ## 模板维护约定（强制）

@@ -19,11 +19,18 @@ alwaysApply: true
 
 ## 失败反馈格式（强制）
 - 固定三段：失败原因 / 定位信息 / 修复动作。
+- **`fc:mcp:ingest` 失败**：终端已打印带 **`log=`、`json=`** 的固定路径（见 `figma-cache/reports/runtime/`，含参数/输入类失败）；对话里只引用路径与 `stage=`，**禁止**贴完整子命令 stdout/stderr。
 
 ## Agent 执行 MCP 落盘 / `fc:mcp:ingest`（强制）
 - **对话区**：禁止逐步复述「Thought」、禁止罗列 staging 临时文件名（如 `dc-a.txt`）；优先 **单次** `--stdin` JSON 或一次性终端落盘，避免多轮 `Write` 制造冗长 diff。
 - **终端**：成功路径使用 **`npm run fc:mcp:ingest:quiet`**（或 **`npm run fc:mcp:ingest -- ... --quiet`** / `--quiet --enrich`），抑制 ensure/validate/budget/enrich 的 JSON **标准输出**；脚本结束时仅一行 `fc:mcp:ingest ok <cacheKey> mcp-raw=...`。
 - **禁止**在聊天里粘贴完整 budget 报表或 manifest；失败时再按三段式简短说明。
+
+## Figma MCP 全链路：主线程极简（强制）
+- 与 **`01-figma-cache-core`**「强约束：父 Agent 禁止直连 Figma MCP / ingest」一致：凡需 **MCP + `fc:mcp:ingest`** 的落盘，**仅**允许在 **`Task`/subagent** 内执行；**父对话禁止**调用 Figma `get_*` 或主会话跑 `fc:mcp:ingest*`，**禁止**为多写几句说明而重复同一套 MCP→ingest 步骤（除非该文件「例外」条款满足）。
+- **父会话成功回复预算**：在未被用户要求「展开」时，**≤ 约 15 行**（含状态行、`fc:mcp:ingest ok` 末行、节点产物目录一行、必要时一行 pass 摘要）；超出即违规，除非失败三段式或用户显式要详情。
+- **子任务返回预算**：子 agent 结束语须可直接被父会话**原样转发**，禁止长篇过程叙述。
+- **多链接**：有 **flow/串联** 时仅 **一个**子任务顺序跑；主会话汇总时**一行一节点**或**短表**，不贴过程（见 `01-figma-cache-core`「多链接与 Subagent 策略」）。
 
 ## 例外
 - 用户明确要求“完整输出/日志/原文”时可放宽上述限制。

@@ -25,26 +25,47 @@
  *   --no-validate         不执行 validate（仍会 ensure，除非同时 --no-ensure）
  *   --skip-budget         不执行 fc:budget --mcp-only（默认会执行）
  *   --enrich              通过后对本节点执行 fc:enrich <url>
+ *   --no-cleanup-staging  禁用成功后删除输入 staging 目录（见下方）
+ *   --materialize-staging 与 --stdin 合用：在本进程 cwd 下创建 staging-ingest-<node>/，
+ *                          写入三段文件与 .fc-mcp-ingest-staging 标记；链路成功后必定删除（脚本自有目录）
  *
  * 也可用 --file-key + --node-id（11069:3124 或 11069-3124）代替 --url。
+ *
+ * 失败时（含参数/输入校验与 gate 子进程）写入 `figma-cache/reports/runtime/mcp-ingest-failure.json` 与 `mcp-ingest-last.log`，终端一行 `fc:mcp:ingest fail ... log=... json=...`；JSON 含 `failureKind`: `preflight`（落盘前）或 `gate`（ensure/validate/budget/enrich）。
+ *
+ * 输入目录清理（成功后，且未 --no-cleanup-staging）：
+ * - 脚本 materialize 生成的目录：凭路径 + 标记文件删除；
+ * - 文件模式：三段在同一父目录下，且（目录名 staging-ingest-* 或含 .fc-mcp-ingest-staging）
+ *   且位于 cwd 之下 → 删除该父目录。
  */
 
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { execFileSync, spawnSync } = require("child_process");
+const { spawnSync } = require("child_process");
 const { URL } = require("url");
 const { parseCli } = require("../cli-args.cjs");
 const { sanitizeDesignContextTextForCache } = require("../sanitize-design-context-for-cache.cjs");
+const { writeMcpIngestFailureArtifact } = require("./mcp-ingest-failure-artifact.cjs");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const BIN = path.join(ROOT, "bin", "figma-cache.js");
+
+let PIPELINE_PKG_VERSION = "unknown";
+try {
+  PIPELINE_PKG_VERSION = require(path.join(ROOT, "package.json")).version;
+} catch (_) {
+  /* ignore */
+}
 
 const DEFAULT_FILES = Object.freeze({
   get_design_context: "mcp-raw-get-design-context.txt",
   get_metadata: "mcp-raw-get-metadata.xml",
   get_variable_defs: "mcp-raw-get-variable-defs.json",
 });
+
+/** 本脚本 materialize 或约定 staging 时写入；删除前用于确认 */
+const STAGING_MARKER_FILE = ".fc-mcp-ingest-staging";
 
 function normalizeNodeIdValue(nodeId) {
   const raw = String(nodeId).trim();
@@ -114,6 +135,84 @@ function resolvePath(p) {
   const raw = String(p || "").trim();
   if (!raw) return "";
   return path.isAbsolute(raw) ? path.normalize(raw) : path.resolve(process.cwd(), raw);
+}
+
+/** @returns {string|null} 三个路径同为某一目录的直接子文件时返回该目录（已 resolve），否则 null */
+function sharedParentDirIfDirectSiblings(absPathA, absPathB, absPathC) {
+  const a = path.resolve(absPathA);
+  const b = path.resolve(absPathB);
+  const c = path.resolve(absPathC);
+  const da = path.dirname(a);
+  const db = path.dirname(b);
+  const dc = path.dirname(c);
+  if (da !== db || db !== dc) {
+    return null;
+  }
+  return da;
+}
+
+function isStrictDescendantOfCwd(absDir, cwd) {
+  const rel = path.relative(cwd, absDir);
+  if (!rel || rel === ".") {
+    return false;
+  }
+  if (path.isAbsolute(rel)) {
+    return false;
+  }
+  return !rel.startsWith(`..${path.sep}`) && !rel.startsWith("..");
+}
+
+function isDisposableStagingIngestDir(absDir) {
+  const base = path.basename(absDir);
+  return /^staging-ingest-/i.test(base);
+}
+
+function hasStagingMarker(absDir) {
+  return fs.existsSync(path.join(absDir, STAGING_MARKER_FILE));
+}
+
+function tryRemoveScriptOwnedStagingDir(absDir, cwd, quiet) {
+  if (!absDir || !fs.existsSync(absDir)) {
+    return;
+  }
+  if (!hasStagingMarker(absDir)) {
+    console.warn("fc:mcp:ingest skip removing script staging: marker missing");
+    return;
+  }
+  if (!isStrictDescendantOfCwd(absDir, cwd)) {
+    console.warn("fc:mcp:ingest skip removing script staging: not under cwd");
+    return;
+  }
+  try {
+    fs.rmSync(absDir, { recursive: true, force: true });
+    if (!quiet) {
+      const rel = path.relative(cwd, absDir) || absDir;
+      console.error(`fc:mcp:ingest removed script staging dir ${rel}`);
+    }
+  } catch (e) {
+    console.warn(`fc:mcp:ingest could not remove script staging dir: ${e.message || e}`);
+  }
+}
+
+function tryRemoveStagingInputDir({ sharedDir, cwd, quiet }) {
+  if (!sharedDir || !fs.existsSync(sharedDir)) {
+    return;
+  }
+  if (!isStrictDescendantOfCwd(sharedDir, cwd)) {
+    return;
+  }
+  if (!isDisposableStagingIngestDir(sharedDir) && !hasStagingMarker(sharedDir)) {
+    return;
+  }
+  try {
+    fs.rmSync(sharedDir, { recursive: true, force: true });
+    if (!quiet) {
+      const rel = path.relative(cwd, sharedDir) || sharedDir;
+      console.error(`fc:mcp:ingest removed input staging dir ${rel}`);
+    }
+  } catch (e) {
+    console.warn(`fc:mcp:ingest could not remove input staging dir: ${e.message || e}`);
+  }
 }
 
 function readStdinUtf8() {
@@ -201,6 +300,10 @@ function buildManifest({ fileKey, nodeIdColon, mcpServer, filesMap, contentsByTo
       get_metadata: 1,
       get_variable_defs: 1,
     },
+    ingestToolchain: {
+      packageVersion: PIPELINE_PKG_VERSION,
+      script: "scripts/workflow/mcp-raw-ingest.cjs",
+    },
   };
 }
 
@@ -216,16 +319,69 @@ function parseArgs(argv) {
       "metadata-file",
       "variable-defs-file",
     ],
-    booleanFlags: ["stdin", "no-sanitize", "no-ensure", "no-validate", "skip-budget", "enrich", "quiet", "help"],
+    booleanFlags: [
+      "stdin",
+      "no-sanitize",
+      "no-ensure",
+      "no-validate",
+      "skip-budget",
+      "enrich",
+      "quiet",
+      "help",
+      "no-cleanup-staging",
+      "materialize-staging",
+    ],
   });
   if (flags.help || unknown.includes("--help")) {
-    return { help: true };
+    return { help: true, values, flags, unknown };
   }
-  if (unknown.length) {
-    console.error(`Unknown arguments: ${unknown.join(", ")}`);
-    process.exit(1);
+  return { help: false, values, flags, unknown };
+}
+
+function resolveCacheDirAbsFromValues(values) {
+  const cacheDirInput = (values["cache-dir"] || process.env.FIGMA_CACHE_DIR || "figma-cache").trim();
+  return path.isAbsolute(cacheDirInput)
+    ? path.normalize(cacheDirInput)
+    : path.resolve(process.cwd(), cacheDirInput);
+}
+
+function inferCacheKeyStr(values, target) {
+  if (target) {
+    return `${target.fileKey}#${target.nodeId}`;
   }
-  return { values, flags };
+  const fk = (values["file-key"] || "").trim();
+  const nidRaw = (values["node-id"] || "").trim();
+  if (fk && nidRaw) {
+    return `${fk}#${normalizeNodeIdValue(nidRaw)}`;
+  }
+  return "invalid-target#-";
+}
+
+function ingestCommandLine() {
+  return process.argv
+    .slice(1)
+    .map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a))
+    .join(" ");
+}
+
+function failPreflight({ values, target, stage, message, exitCode = 1, stdout = "" }) {
+  const cacheDirAbs = resolveCacheDirAbsFromValues(values);
+  const cacheKeyStr = inferCacheKeyStr(values, target);
+  const rel = writeMcpIngestFailureArtifact({
+    cacheDirAbs,
+    cacheKeyStr,
+    stage,
+    exitCode,
+    commandLine: ingestCommandLine(),
+    stdout,
+    stderr: String(message || ""),
+    cwdForRelative: process.cwd(),
+    failureKind: "preflight",
+  });
+  console.error(
+    `fc:mcp:ingest fail ${cacheKeyStr} stage=${stage} exit=${exitCode} log=${rel.logPath} json=${rel.jsonPath}`,
+  );
+  process.exit(exitCode);
 }
 
 function resolveTargetUrl(values) {
@@ -264,6 +420,8 @@ Options:
   --no-validate            不执行 fc:validate
   --skip-budget            不执行 fc:budget --mcp-only（默认在 validate 后执行）
   --enrich                 对本节点执行 fc:enrich <url>
+  --no-cleanup-staging     保留输入 staging 临时目录（默认成功后删除）
+  --materialize-staging    与 --stdin 合用：在 cwd 下生成 staging-ingest-<node>/ 与标记，完成后删除
   --quiet                  成功时仅打印一行摘要；抑制 ensure/validate/budget/enrich 的 JSON 标准输出
   --help                   显示本说明
 `);
@@ -271,14 +429,6 @@ Options:
 
 function runFigCacheChild(cliArgs, env, quiet) {
   const full = [BIN, ...cliArgs];
-  if (!quiet) {
-    execFileSync(process.execPath, full, {
-      cwd: ROOT,
-      env: { ...process.env, ...env },
-      stdio: "inherit",
-    });
-    return;
-  }
   const r = spawnSync(process.execPath, full, {
     cwd: ROOT,
     env: { ...process.env, ...env },
@@ -286,19 +436,63 @@ function runFigCacheChild(cliArgs, env, quiet) {
     maxBuffer: 50 * 1024 * 1024,
   });
   if (r.error) {
-    console.error(r.error.message || String(r.error));
-    process.exit(2);
+    return {
+      ok: false,
+      code: 2,
+      stdout: "",
+      stderr: r.error.message || String(r.error),
+    };
   }
   if (r.signal) {
-    process.stderr.write(`figma-cache child signal: ${r.signal}\n`);
-    process.exit(2);
+    return {
+      ok: false,
+      code: 2,
+      stdout: r.stdout || "",
+      stderr: `${r.stderr || ""}\nfigma-cache child signal: ${r.signal}\n`,
+    };
   }
   const code = r.status;
-  if (code !== 0) {
-    if (r.stdout) process.stderr.write(r.stdout);
-    if (r.stderr) process.stderr.write(r.stderr);
-    process.exit(typeof code === "number" ? code : 2);
+  const out = r.stdout || "";
+  const err = r.stderr || "";
+  if (!quiet) {
+    if (out) process.stdout.write(out);
+    if (err) process.stderr.write(err);
   }
+  if (code !== 0) {
+    return {
+      ok: false,
+      code: typeof code === "number" ? code : 2,
+      stdout: out,
+      stderr: err,
+    };
+  }
+  return { ok: true, code: 0, stdout: out, stderr: err };
+}
+
+function failIngest({
+  cacheDirAbs,
+  cacheKeyStr,
+  stage,
+  exitCode,
+  commandLine,
+  stdout,
+  stderr,
+}) {
+  const rel = writeMcpIngestFailureArtifact({
+    cacheDirAbs,
+    cacheKeyStr,
+    stage,
+    exitCode,
+    commandLine,
+    stdout,
+    stderr,
+    cwdForRelative: process.cwd(),
+    failureKind: "gate",
+  });
+  console.error(
+    `fc:mcp:ingest fail ${cacheKeyStr} stage=${stage} exit=${exitCode} log=${rel.logPath} json=${rel.jsonPath}`,
+  );
+  process.exit(typeof exitCode === "number" && exitCode !== 0 ? exitCode : 2);
 }
 
 function main() {
@@ -308,21 +502,116 @@ function main() {
     process.exit(0);
   }
 
-  const { values, flags } = parsed;
-  const stdinPayload = flags.stdin ? parseStdinJson(readStdinUtf8()) : null;
+  const { values, flags, unknown } = parsed;
+  if (unknown.length) {
+    failPreflight({
+      values,
+      target: null,
+      stage: "args",
+      message: `Unknown arguments: ${unknown.join(", ")}`,
+    });
+  }
+
+  let stdinPayload = null;
+  if (flags.stdin) {
+    try {
+      stdinPayload = parseStdinJson(readStdinUtf8());
+    } catch (e) {
+      failPreflight({
+        values,
+        target: null,
+        stage: "input",
+        message: e.message || String(e),
+      });
+    }
+  }
 
   let target;
   try {
     target = resolveTargetUrl(values);
   } catch (e) {
-    console.error(e.message || e);
-    process.exit(1);
+    failPreflight({
+      values,
+      target: null,
+      stage: "target",
+      message: e.message || String(e),
+    });
   }
 
-  const cacheDirInput = (values["cache-dir"] || process.env.FIGMA_CACHE_DIR || "figma-cache").trim();
-  const cacheDirAbs = path.isAbsolute(cacheDirInput)
-    ? path.normalize(cacheDirInput)
-    : path.resolve(process.cwd(), cacheDirInput);
+  if (flags["materialize-staging"] && !flags.stdin) {
+    failPreflight({
+      values,
+      target,
+      stage: "materialize",
+      message: "--materialize-staging requires --stdin",
+    });
+  }
+
+  /** 由本脚本 --materialize-staging 创建，结束时凭标记删除 */
+  let scriptOwnedStagingAbs = null;
+
+  if (flags["materialize-staging"]) {
+    if (!stdinPayload) {
+      failPreflight({
+        values,
+        target,
+        stage: "materialize",
+        message: "stdin is empty; --materialize-staging needs JSON payload",
+      });
+    }
+    const dcRaw = stdinPayload.get_design_context ?? stdinPayload.designContext;
+    const metaRaw = stdinPayload.get_metadata ?? stdinPayload.metadata;
+    const vdRaw = stdinPayload.get_variable_defs ?? stdinPayload.variableDefs;
+    if (dcRaw === undefined || dcRaw === null || metaRaw === undefined || metaRaw === null) {
+      failPreflight({
+        values,
+        target,
+        stage: "payload",
+        message:
+          "stdin JSON must include get_design_context and get_metadata (or camelCase designContext, metadata)",
+      });
+    }
+    if (vdRaw === undefined || vdRaw === null) {
+      failPreflight({
+        values,
+        target,
+        stage: "payload",
+        message: "stdin JSON must include get_variable_defs (or variableDefs)",
+      });
+    }
+
+    const cwd = process.cwd();
+    scriptOwnedStagingAbs = path.join(cwd, `staging-ingest-${sanitizeNodeId(target.nodeId)}`);
+    fs.rmSync(scriptOwnedStagingAbs, { recursive: true, force: true });
+    fs.mkdirSync(scriptOwnedStagingAbs, { recursive: true });
+
+    writeUtf8(path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_design_context), String(dcRaw));
+    writeUtf8(path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_metadata), `${String(metaRaw).trimEnd()}\n`);
+    let vdSerialized;
+    try {
+      vdSerialized = stringifyVariableDefs(vdRaw);
+    } catch (e) {
+      failPreflight({
+        values,
+        target,
+        stage: "payload",
+        message: e.message || String(e),
+      });
+    }
+    writeUtf8(path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_variable_defs), vdSerialized);
+    fs.writeFileSync(
+      path.join(scriptOwnedStagingAbs, STAGING_MARKER_FILE),
+      `${JSON.stringify({ v: 1, nodeId: target.nodeId, fileKey: target.fileKey })}\n`,
+      "utf8",
+    );
+
+    stdinPayload = null;
+    values["design-context-file"] = path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_design_context);
+    values["metadata-file"] = path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_metadata);
+    values["variable-defs-file"] = path.join(scriptOwnedStagingAbs, DEFAULT_FILES.get_variable_defs);
+  }
+
+  const cacheDirAbs = resolveCacheDirAbsFromValues(values);
 
   const mcpServer = (values["mcp-server"] || process.env.FIGMA_MCP_SERVER_NAME || "user-Figma").trim() || "user-Figma";
 
@@ -330,22 +619,29 @@ function main() {
   try {
     payload = pickPayload(stdinPayload, values);
   } catch (e) {
-    console.error(e.message || e);
-    process.exit(1);
+    failPreflight({
+      values,
+      target,
+      stage: "input",
+      message: e.message || String(e),
+    });
   }
 
   let designContextText = payload.designContext;
-  if (!flags["no-sanitize"]) {
-    designContextText = sanitizeDesignContextTextForCache(designContextText);
-  }
-
   const metaText = `${payload.metadata.trimEnd()}\n`;
   let vdText;
   try {
+    if (!flags["no-sanitize"]) {
+      designContextText = sanitizeDesignContextTextForCache(designContextText);
+    }
     vdText = stringifyVariableDefs(payload.variableDefs);
   } catch (e) {
-    console.error(e.message || e);
-    process.exit(1);
+    failPreflight({
+      values,
+      target,
+      stage: "write-prep",
+      message: e.message || String(e),
+    });
   }
 
   const safeNode = sanitizeNodeId(target.nodeId);
@@ -358,18 +654,29 @@ function main() {
     get_variable_defs: vdText,
   };
 
-  writeUtf8(path.join(mcpRawDir, filesMap.get_design_context), contentsByTool.get_design_context);
-  writeUtf8(path.join(mcpRawDir, filesMap.get_metadata), contentsByTool.get_metadata);
-  writeUtf8(path.join(mcpRawDir, filesMap.get_variable_defs), contentsByTool.get_variable_defs);
+  let manifest;
+  try {
+    writeUtf8(path.join(mcpRawDir, filesMap.get_design_context), contentsByTool.get_design_context);
+    writeUtf8(path.join(mcpRawDir, filesMap.get_metadata), contentsByTool.get_metadata);
+    writeUtf8(path.join(mcpRawDir, filesMap.get_variable_defs), contentsByTool.get_variable_defs);
 
-  const manifest = buildManifest({
-    fileKey: target.fileKey,
-    nodeIdColon: target.nodeId,
-    mcpServer,
-    filesMap,
-    contentsByTool,
-  });
-  writeUtf8(path.join(mcpRawDir, "mcp-raw-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+    manifest = buildManifest({
+      fileKey: target.fileKey,
+      nodeIdColon: target.nodeId,
+      mcpServer,
+      filesMap,
+      contentsByTool,
+    });
+    writeUtf8(path.join(mcpRawDir, "mcp-raw-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  } catch (e) {
+    failPreflight({
+      values,
+      target,
+      stage: "write",
+      message: e.message || String(e),
+      exitCode: 2,
+    });
+  }
 
   const out = {
     ok: true,
@@ -394,24 +701,89 @@ function main() {
 
   const quiet = Boolean(flags.quiet);
 
+  function figCacheCmd(cliArgs) {
+    return [process.execPath, BIN, ...cliArgs].join(" ");
+  }
+
   if (!flags["no-ensure"]) {
-    runFigCacheChild(["ensure", target.normalizedUrl, "--source=figma-mcp"], env, quiet);
+    const args = ["ensure", target.normalizedUrl, "--source=figma-mcp"];
+    const r = runFigCacheChild(args, env, quiet);
+    if (!r.ok) {
+      failIngest({
+        cacheDirAbs,
+        cacheKeyStr,
+        stage: "ensure",
+        exitCode: r.code,
+        commandLine: figCacheCmd(args),
+        stdout: r.stdout,
+        stderr: r.stderr,
+      });
+    }
   }
 
   if (!flags["no-validate"]) {
-    runFigCacheChild(["validate"], env, quiet);
+    const args = ["validate"];
+    const r = runFigCacheChild(args, env, quiet);
+    if (!r.ok) {
+      failIngest({
+        cacheDirAbs,
+        cacheKeyStr,
+        stage: "validate",
+        exitCode: r.code,
+        commandLine: figCacheCmd(args),
+        stdout: r.stdout,
+        stderr: r.stderr,
+      });
+    }
   }
 
   if (!flags["skip-budget"]) {
-    runFigCacheChild(["budget", "--mcp-only"], env, quiet);
+    const args = ["budget", "--mcp-only"];
+    const r = runFigCacheChild(args, env, quiet);
+    if (!r.ok) {
+      failIngest({
+        cacheDirAbs,
+        cacheKeyStr,
+        stage: "budget",
+        exitCode: r.code,
+        commandLine: figCacheCmd(args),
+        stdout: r.stdout,
+        stderr: r.stderr,
+      });
+    }
   }
 
   if (flags.enrich) {
-    runFigCacheChild(["enrich", target.normalizedUrl], env, quiet);
+    const args = ["enrich", target.normalizedUrl];
+    const r = runFigCacheChild(args, env, quiet);
+    if (!r.ok) {
+      failIngest({
+        cacheDirAbs,
+        cacheKeyStr,
+        stage: "enrich",
+        exitCode: r.code,
+        commandLine: figCacheCmd(args),
+        stdout: r.stdout,
+        stderr: r.stderr,
+      });
+    }
   }
 
   if (flags.quiet) {
     console.log(`fc:mcp:ingest ok ${cacheKeyStr} mcp-raw=${out.mcpRawDir}`);
+  }
+
+  if (!flags["no-cleanup-staging"]) {
+    const cwd = process.cwd();
+    if (scriptOwnedStagingAbs) {
+      tryRemoveScriptOwnedStagingDir(scriptOwnedStagingAbs, cwd, quiet);
+    } else if (!flags.stdin) {
+      const dcIn = resolvePath(values["design-context-file"] || values.designContextFile);
+      const metaIn = resolvePath(values["metadata-file"] || values.metadataFile);
+      const vdIn = resolvePath(values["variable-defs-file"] || values.variableDefsFile);
+      const shared = sharedParentDirIfDirectSiblings(dcIn, metaIn, vdIn);
+      tryRemoveStagingInputDir({ sharedDir: shared, cwd, quiet });
+    }
   }
 }
 

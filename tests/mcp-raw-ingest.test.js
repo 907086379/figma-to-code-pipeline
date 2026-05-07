@@ -116,6 +116,8 @@ function run() {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   assert.strictEqual(manifest.mcpServer, "test-fake-mcp");
   assert.ok(manifest.fileHashes.get_design_context);
+  assert.ok(manifest.ingestToolchain && manifest.ingestToolchain.packageVersion, "manifest.ingestToolchain.packageVersion");
+  assert.strictEqual(manifest.ingestToolchain.script, "scripts/workflow/mcp-raw-ingest.cjs");
 
   const dcCached = fs.readFileSync(
     path.join(path.dirname(manifestPath), "mcp-raw-get-design-context.txt"),
@@ -181,6 +183,147 @@ function run() {
   assert.ok(/^fc:mcp:ingest ok /.test(quietLines[0]), quietLines[0]);
 
   fs.rmSync(quietRoot, { recursive: true, force: true });
+
+  // staging-ingest-* 输入目录在成功后应被删除（位于 cwd 下时）
+  const cleanupBase = path.join(root, "tests", ".mcp-staging-cleanup");
+  const stagingName = "staging-ingest-1-2";
+  const stagingDir = path.join(cleanupBase, stagingName);
+  fs.mkdirSync(stagingDir, { recursive: true });
+  const stDc = path.join(stagingDir, "dc.txt");
+  const stMeta = path.join(stagingDir, "meta.xml");
+  const stVd = path.join(stagingDir, "vd.json");
+  fs.writeFileSync(stDc, buildSmokeDesignContext(NODE_ID), "utf8");
+  fs.writeFileSync(stMeta, `<symbol id="1:2" name="smoke" />\n`, "utf8");
+  fs.writeFileSync(stVd, `${JSON.stringify({ "colors/smoke/test": "#112233" }, null, 2)}\n`, "utf8");
+
+  const cleanupTemp = fs.mkdtempSync(path.join(os.tmpdir(), "fc-mcp-staging-rm-"));
+  const cleanupCache = path.join(cleanupTemp, "figma-cache");
+  fs.mkdirSync(cleanupCache, { recursive: true });
+  fs.writeFileSync(
+    path.join(cleanupCache, "index.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 2,
+        version: 1,
+        normalizationVersion: 1,
+        updatedAt: null,
+        flows: {},
+        items: {},
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
+  try {
+    assert.ok(fs.existsSync(stagingDir), "precondition: staging dir exists");
+    execFileSync(
+      process.execPath,
+      [
+        ingest,
+        `--url=${TEST_URL}`,
+        `--cache-dir=${cleanupCache}`,
+        `--mcp-server=test-fake-mcp`,
+        `--design-context-file=${stDc}`,
+        `--metadata-file=${stMeta}`,
+        `--variable-defs-file=${stVd}`,
+        "--no-ensure",
+        "--no-validate",
+        "--skip-budget",
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          FIGMA_CACHE_DIR: cleanupCache,
+        },
+      },
+    );
+    assert.ok(!fs.existsSync(stagingDir), "staging-ingest-* input dir should be removed after success");
+  } finally {
+    fs.rmSync(cleanupTemp, { recursive: true, force: true });
+    fs.rmSync(cleanupBase, { recursive: true, force: true });
+  }
+
+  // --stdin --materialize-staging：脚本自建 staging，成功后删除
+  const matRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fc-mcp-materialize-"));
+  const matCache = path.join(matRoot, "figma-cache");
+  fs.mkdirSync(matCache, { recursive: true });
+  fs.writeFileSync(
+    path.join(matCache, "index.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 2,
+        version: 1,
+        normalizationVersion: 1,
+        updatedAt: null,
+        flows: {},
+        items: {},
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  const matStaging = path.join(matRoot, "staging-ingest-1-2");
+  const matPayload = JSON.stringify({
+    get_design_context: buildSmokeDesignContext(NODE_ID),
+    get_metadata: `<symbol id="1:2" name="smoke" />\n`,
+    get_variable_defs: { "colors/smoke/test": "#112233" },
+  });
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        ingest,
+        "--stdin",
+        "--materialize-staging",
+        `--url=${TEST_URL}`,
+        `--cache-dir=${matCache}`,
+        `--mcp-server=test-fake-mcp`,
+        "--no-ensure",
+        "--no-validate",
+        "--skip-budget",
+      ],
+      {
+        cwd: matRoot,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        input: matPayload,
+        env: {
+          ...process.env,
+          FIGMA_CACHE_DIR: matCache,
+        },
+      },
+    );
+    assert.ok(!fs.existsSync(matStaging), "materialize staging dir should be removed after success");
+  } finally {
+    fs.rmSync(matRoot, { recursive: true, force: true });
+  }
+
+  const badRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fc-mcp-ingest-fail-"));
+  const badCache = path.join(badRoot, "figma-cache");
+  fs.mkdirSync(badCache, { recursive: true });
+  let threw = false;
+  try {
+    execFileSync(
+      process.execPath,
+      [ingest, "--not-a-real-flag", `--cache-dir=${badCache}`, `--url=${TEST_URL}`],
+      { cwd: root, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+    );
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, "unknown flag should fail");
+  const failJson = path.join(badCache, "reports", "runtime", "mcp-ingest-failure.json");
+  assert.ok(fs.existsSync(failJson), "preflight failure should write mcp-ingest-failure.json");
+  const failBody = JSON.parse(fs.readFileSync(failJson, "utf8"));
+  assert.strictEqual(failBody.failureKind, "preflight");
+  assert.strictEqual(failBody.stage, "args");
+  fs.rmSync(badRoot, { recursive: true, force: true });
 
   console.log("mcp-raw-ingest.test: ok");
 }

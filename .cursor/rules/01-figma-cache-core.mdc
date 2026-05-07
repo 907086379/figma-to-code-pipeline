@@ -11,10 +11,36 @@ alwaysApply: true
 - 消息包含可解析 Figma 链接、`fileKey+nodeId`、或明确“figma-cache/本地缓存/刷新”语义。
 - 非触发：纯概念讨论且无可解析链接/节点线索。
 
+## 执行拓扑与 Subagent 默认（强制）
+- **目的**：将「Figma MCP → `mcp-raw` 落盘 → `fc:ensure`/`fc:validate`/`fc:budget`（及按需 `--enrich`）」所需的**多轮工具与终端输出**隔离到子会话，**父对话**只保留极短结论，降低主线程上下文占用与界面噪音（工具卡片为产品行为，规则侧通过流程分流减少主会话触发次数）。
+- **默认**：当命中上文触发条件且需要 **调用 MCP 并执行 `fc:mcp:ingest`（含 quiet）** 时，**父 Agent 不得在同一节点上亲自跑完整条链路**（不重复 `get_*` 再 ingest），应 **单次** 使用 **`Task`（subagent）** 委派完成；适合后台时用 `run_in_background: true`（多任务模式），避免阻塞父会话。
+- **`Task` 类型默认（固定）**：`subagent_type` = **`generalPurpose`**。原因：本链路需要 **Figma MCP**、**终端跑 `fc:mcp:ingest:quiet`**、**写入 `figma-cache/**`** 以及失败时自修，这是「读+写+命令」混合流程。**不要用** `explore`：它偏只读探索，与落盘/ingest 冲突；**不要用** `shell` 单独顶替整条子任务：易漏 MCP 步骤或校验闭环。未在规则里写死具体 LLM 型号，避免与 Cursor 产品迭代绑定；由 Cursor 为 `generalPurpose` 使用当前产品默认子代理模型即可。
+- **委派 `prompt` 必含**（可用条目列表形式一次写清）：规范化后的 **URL** 或 **`fileKey` + `nodeId`**、是否需要 **`--enrich`**、项目根下执行 **`npm run fc:mcp:ingest:quiet`**（或等价：`pnpm` / `node scripts/workflow/mcp-raw-ingest.cjs ... --quiet`）、若用手写文件则给出**一次性**路径或 **`--stdin` JSON** 约定；并写明子任务 **成功时回复仅限**：`01` 节「输出格式」允许的字段，**禁止**逐步复述 Thought、**禁止**罗列 staging 临时文件名（如 `dc-a.txt`）、**禁止**贴 MCP 长原文 / 完整 manifest / budget 报表。正文骨架以仓库 **`docs/figma-mcp-ingest-subagent-prompt.md`** 为唯一真源（随 `fc:mcp:ingest` 参数变更时同步更新该文档与 `npm run verify:cursor:sync`）。
+- **父 Agent 收尾**：子任务成功后，父 Agent **只抄录**子任务返回的极简结论（同一套字段），**禁止**再调用 MCP 或再跑 ingest「复核」。
+- **例外**（允许父会话自跑全链路，但仍须 **`fc:mcp:ingest:quiet`** + `00-output-token-budget` 的极简回复）：
+  1. 用户**显式**要求在当前对话内逐步展示或由父 Agent 亲自执行（须含可引用原话，如「由你在本对话直接调 Figma MCP」）；
+  2. **`Task`/subagent 不可用**，或**连续两次**委派失败且用户同意改为父会话执行；
+  3. **仅**读本地缓存、字段足够、**无需**调用 MCP；
+  4. 纯概念讨论、无落盘与 ingest 需求。
+
+### 强约束：父 Agent 禁止直连 Figma MCP / ingest（缓存闭环）
+- **适用**：已判定需 **拉取 MCP 三段并执行 `fc:mcp:ingest`**（含 `--enrich`）以写入/更新 `figma-cache` 时。
+- **禁止（父会话 / 当前对话中的主 Agent）**：
+  - **不得**调用 Figma MCP 的 **`get_design_context`**、**`get_metadata`**、**`get_variable_defs`**（含同名或等价读稿工具），也**不得**在主会话执行 **`npm run fc:mcp:ingest`** / **`fc:mcp:ingest:quiet`** / `node scripts/workflow/mcp-raw-ingest.cjs` 完成该闭环。
+  - **不得以**「更快」「少写 Task」「省事」为由绕过；此类理由**不构成**例外。
+- **必须先**：使用 **`Task`**，`subagent_type` = **`generalPurpose`**，由**子会话独占**完成 MCP → `--stdin` 或文件 → **`fc:mcp:ingest:quiet`** → ensure/validate/budget（及按需 `--enrich`）。
+- **唯一入口（主会话）**：在需 **MCP + ingest** 的任一节点的落盘上，主会话为 **0 次** MCP、**0 次** ingest。`Task` 的**次数与拆批**由下方「多链接与 Subagent 策略」决定；**不得**为「少开 Task」而在主会话亲自跑 ingest。
+- **违规**：主会话出现上述禁止项之一且无「例外」条款支撑，即视为违反本仓库规则。
+
+## 多链接与 Subagent 策略（强制）
+- **Flow / 串联批次**（任一命中）：消息含 **多个可解析链接**，且出现 **`flow` 维度触发条件**（关系关键词：关联/流程/跳转/前后页/上一步/下一步/分支/链路/路径/from/to/next/branch），或用户**明确表达**多屏串联/同一用户路径 —— **必须使用恰好一个 `Task`（`generalPurpose`）**，在**子会话内按用户给定顺序**（未说明则按消息中链接出现顺序）**逐节点**完成：每步先读 `figma-cache/index.json` 与本地节点目录，**能命中且字段足够则跳过该节点 MCP**；未命中再对该节点走 MCP 三件套 + `fc:mcp:ingest:quiet`（按需 `--enrich`）。**禁止**为同一条 flow 链再拆多个并行 `Task`（避免跨子会话丢失关系、重复污染与主会话汇总成本）。
+- **独立多节点批次**：多链接、**无** flow/串联意图、各节点相对独立 —— 允许多个 `Task` **并行**（如不同 `fileKey` 或明显无关的节点），以缩短墙钟时间；**主会话仅派发**与收**极简结果**（可一行一节点，禁止贴长日志），**仍禁止**主会话直连 Figma MCP 或主会话 ingest。
+- **混合**：若部分链、部分独立，主会话**只用文字**说明分组（**不调 MCP**），或发 **一个** `Task` 内先排序再分链处理；**避免**主会话内逐链调工具。
+
 ## 标准流程（强制）
 1. 标准化链接并读取 `figma-cache/index.json`。
 2. 命中且字段足够：只读本地，不调 MCP。
-3. 未命中或字段不足：调用 MCP 最小集并落盘：
+3. 未命中或字段不足：**由 `Task`（`generalPurpose`）子会话**调用 MCP 最小集并落盘（主会话**禁止**亲自执行，见上文「强约束」）：
    - `get_design_context`（默认 `excludeScreenshot=true`）
    - `get_metadata`
    - `get_variable_defs`
@@ -38,8 +64,13 @@ alwaysApply: true
 ## 输出格式（强制）
 - 命中触发且涉及缓存读写时，首行必须：
   - `> 🔄 Figma 缓存状态: [命中|缺失|更新] | 来源: [Local|MCP] | 节点: {nodeId}`
-- 仅输出：`mcp-raw anti-truncation`、MCP 调用统计、completeness、产物路径、validate 结果。
-- 自动追加 `flow` 时必须标注触发原因（关键词命中/多链接串联意图）。
+- **成功路径（默认）**：除首行外，**最多**再输出 —— (1) 终端中 **`fc:mcp:ingest` 成功时的最后一行**（含 `fc:mcp:ingest ok ...`）；(2) **一段**核心产物定位：优先 **`figma-cache/files/<fileKey>/nodes/<nodeId>/`**（或等价节点目录），必要时 **一行**说明 `mcp-raw anti-truncation` / validate / completeness 为 **pass**（勿展开子文件表）。**禁止**：逐步 Thought、Explored 条数、长 diff、`Write` 工具生成的大段 staging 片段、完整 manifest、budget 全文、MCP 工具返回原文。
+- **失败路径**：使用 `00-output-token-budget` 的**三段式**；可附 **一条**关键命令与退出码。`fc:mcp:ingest` 任意非 0 退出（含参数/输入错误与 ensure/validate/budget/enrich 失败）时终端均会给出 **`log=`** / **`json=`** 路径（`figma-cache/reports/runtime/mcp-ingest-last.log` 与 `mcp-ingest-failure.json`）；JSON 中 `failureKind` 为 `preflight`（mcp-raw 落盘前）或 `gate`（子进程 gate）。子任务/父会话**只转发路径**与 `stage=`，不贴长日志；需要细节时在本地打开文件或用 `Read` 读路径。
+- 自动追加 `flow` 时必须标注触发原因（关键词命中/多链接串联意图），**一行**即可。
+
+## 索引与磁盘一致性（工程化，强制）
+- **漂移检测**：磁盘已有 `mcp-raw/mcp-raw-manifest.json` 但 `index.json` 缺项时，在项目根执行 **`npm run fc:cache:reconcile`**（默认 dry-run）；确认输出后 **`npm run fc:cache:reconcile -- --apply`** 对缺失项执行 `figma-cache ensure` 回填索引与派生文件。若同时传 **`--dry-run` 与 `--apply`**，以 **`--dry-run` 为准**（不执行 ensure）。
+- **manifest**：`mcp-raw-manifest.json` 含 **`ingestToolchain`**（npm 包版本与 ingest 脚本路径），用于判断缓存产出与当前工具链是否同代。
 
 ## 低 token 与编码（强制）
 - 用户可见回复禁止粘贴 MCP 长原文；除非用户明确要求。

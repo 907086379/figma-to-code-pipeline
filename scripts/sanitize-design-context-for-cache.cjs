@@ -11,7 +11,8 @@ function sanitizeDesignContextTextForCache(input) {
   let text = String(input || "");
   // MCP appends an LLM prompt after the generated component (often glued as `}SUPER CRITICAL:...`).
   // Includes: conversion checklist, Tailwind disclaimer, token dump, component docs, image URL notes.
-  text = text.replace(/\s*SUPER CRITICAL:[\s\S]*$/i, "");
+  // Optional Markdown emphasis; colon may vary slightly — strip everything from this anchor to EOF.
+  text = text.replace(/\s*\*{0,2}\s*SUPER\s+CRITICAL\s*:\s*[\s\S]*$/i, "");
   // React/TSX variable-font noise
   text = text.replace(/\sstyle=\{\{\s*fontVariationSettings\s*:\s*"[^"]*"\s*\}\}/g, "");
   text = text.replace(/\sstyle=\{\{\s*fontVariationSettings\s*:\s*'[^']*'\s*\}\}/g, "");

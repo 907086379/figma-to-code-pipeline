@@ -51,6 +51,10 @@
     {
       "from": "examples/ui-policy.json",
       "to": "ui-policy.json"
+    },
+    {
+      "from": "docs/figma-mcp-ingest-subagent-prompt.md",
+      "to": "docs/figma-mcp-ingest-subagent-prompt.md"
     }
   ],
   "retiredFiles": [

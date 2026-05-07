@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 4.2.0（2026-05-07）
+
+- **`fc:mcp:ingest`**：任意非 0 退出均写入 **`figma-cache/reports/runtime/`**（`mcp-ingest-last.log` / `mcp-ingest-failure.json`），终端固定 **`log=`** / **`json=`**；JSON 字段 **`failureKind`** 区分 **`preflight`**（落盘前校验）与 **`gate`**（ensure / validate / budget / enrich 子进程）。
+- **新增 `fc:cache:reconcile`**（`scripts/workflow/cache-index-reconcile.cjs`）：扫描磁盘 `mcp-raw-manifest` 与 **`index.json`** 差异；默认 **dry-run**，**`--apply`** 对缺失项执行 `ensure`；同时传 **`--dry-run`** 与 **`--apply`** 时以 **`--dry-run`** 为准。
+- **文档与 Cursor**：子任务模板真源 **`cursor-bootstrap/docs/figma-mcp-ingest-subagent-prompt.md`** 纳入 **`managed-files.json`** 镜像；规则 **`00-output-token-budget`** / **`01-figma-cache-core`** 与 **`figma-mcp-local-cache`** Skill 同步。
+- **`package.json`**：`test:node` 串联 sanitize / failure artifact / reconcile 相关单测；npm scripts 增加 **`fc:cache:reconcile`**。
+
 ## 4.1.0（2026-05-07）
 
 - **仓库卫生**：`.gitignore` 默认忽略 `figma-cache/files/` 与 `figma-cache/mobile-specs/`；移除已入库的示例节点与 mobile-spec；`figma-cache/index.json` 重置为空索引；`docs/figma-flow-readme.md` 登记区不与本地缓存路径绑定。

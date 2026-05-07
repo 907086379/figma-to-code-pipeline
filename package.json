@@ -1,6 +1,6 @@
 {
     "name": "figma-to-code-pipeline",
-    "version": "4.1.0",
+    "version": "4.2.0",
     "description": "Figma link normalization, local cache index, validation, and Node CLI (framework-agnostic core).",
     "packageManager": "pnpm@9.15.4",
     "homepage": "https://github.com/907086379/figma-to-code-pipeline#readme",

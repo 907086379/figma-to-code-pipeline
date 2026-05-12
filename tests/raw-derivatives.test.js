@@ -4,6 +4,7 @@ const assert = require("assert");
 const {
   mergeLayoutMetricsFromGeometry,
   buildEvidenceSummary,
+  extractFigmaDataAnnotationsFromDesignContext,
 } = require("../figma-cache/js/raw-derivatives");
 
 {
@@ -25,6 +26,7 @@ const {
     geometryFilePresent: true,
     iconMetricsCount: 3,
     layoutMetricsCount: 4,
+    figmaDataAnnotationCount: 5,
   });
   assert.strictEqual(s.version, 1);
   assert.ok(s.generatedAt);
@@ -36,6 +38,41 @@ const {
   assert.strictEqual(s.geometryFilePresent, true);
   assert.strictEqual(s.iconMetricsCount, 3);
   assert.strictEqual(s.layoutMetricsCount, 4);
+  assert.strictEqual(s.figmaDataAnnotationCount, 5);
+}
+
+{
+  const dc =
+    '<div data-node-id="11038:687" data-annotations="这是为了测试所加的annotation" data-name="Card" class="x">';
+  const ann = extractFigmaDataAnnotationsFromDesignContext(dc);
+  assert.strictEqual(ann.schemaVersion, 1);
+  assert.strictEqual(ann.items.length, 1);
+  assert.strictEqual(ann.items[0].nodeId, "11038:687");
+  assert.strictEqual(ann.items[0].name, "Card");
+  assert.strictEqual(ann.items[0].text, "这是为了测试所加的annotation");
+}
+
+{
+  const dc = '<div data-annotations="line\\n2" data-node-id="9:1" />';
+  const ann = extractFigmaDataAnnotationsFromDesignContext(dc);
+  assert.strictEqual(ann.items[0].text, "line\n2");
+}
+
+{
+  const dc =
+    "<div data-node-id='11038:687' data-annotations='单引号属性' data-name='卡片' class=\"x\">";
+  const ann = extractFigmaDataAnnotationsFromDesignContext(dc);
+  assert.strictEqual(ann.items.length, 1);
+  assert.strictEqual(ann.items[0].nodeId, "11038:687");
+  assert.strictEqual(ann.items[0].name, "卡片");
+  assert.strictEqual(ann.items[0].text, "单引号属性");
+}
+
+{
+  const dc = '<div data-node-id="99:88" data-name="Line\\nName" data-annotations="x" />';
+  const ann = extractFigmaDataAnnotationsFromDesignContext(dc);
+  assert.strictEqual(ann.items[0].nodeId, "99:88");
+  assert.strictEqual(ann.items[0].name, "Line\nName");
 }
 
 console.log("raw-derivatives.test: ok");

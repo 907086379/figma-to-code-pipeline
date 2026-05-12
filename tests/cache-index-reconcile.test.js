@@ -33,6 +33,9 @@ function buildSmokeDesignContext(nodeId) {
   lines.push(
     `    <div className="bg-[#111111] flex flex-col gap-2 p-4" data-node-id="${nid}" data-name="smoke-root">`,
   );
+  lines.push(
+    `      <div data-node-id="11038:687" data-annotations="这是为了测试所加的annotation" data-name="Card" className="w-px h-px overflow-hidden" aria-hidden="true" />`,
+  );
   for (let i = 0; i < 12; i += 1) {
     lines.push(`      <div data-node-id="98:${100 + i}" className="content-stretch flex size-[24px]">`);
     lines.push(

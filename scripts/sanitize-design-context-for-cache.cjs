@@ -4,7 +4,9 @@
 /**
  * Normalizes Figma MCP `get_design_context` payloads before persisting to mcp-raw.
  * Removes LLM instruction trailers and variable-font axis noise; keeps JSX/layout
- * used by toolchain heuristics (inset %, text snippets, data-node-id, assets).
+ * used by toolchain heuristics (inset %, text snippets, data-node-id, data-annotations, assets).
+ * Note: Figma/Dev Mode notes often appear as `data-annotations="…"` on the same tag as
+ * `data-node-id` (inside the generated component, before the SUPER CRITICAL anchor) — those are kept.
  */
 
 function sanitizeDesignContextTextForCache(input) {

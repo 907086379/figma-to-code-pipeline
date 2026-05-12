@@ -2,7 +2,112 @@
   "schemaVersion": 2,
   "version": 1,
   "normalizationVersion": 1,
-  "updatedAt": null,
+  "updatedAt": "2026-05-12T07:40:39.160Z",
   "flows": {},
-  "items": {}
+  "items": {
+    "uXebQLeH4VAJbjcPtYelUp#11038:684": {
+      "fileKey": "uXebQLeH4VAJbjcPtYelUp",
+      "nodeId": "11038:684",
+      "scope": "node",
+      "url": "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11038%3A684",
+      "originalUrls": [
+        "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11038%3A684"
+      ],
+      "normalizationVersion": 1,
+      "paths": {
+        "meta": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-684/meta.json",
+        "spec": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-684/spec.md",
+        "stateMap": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-684/state-map.md",
+        "raw": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-684/raw.json"
+      },
+      "syncedAt": "2026-05-12T03:31:02.640Z",
+      "completeness": [
+        "layout",
+        "text",
+        "tokens",
+        "interactions",
+        "states",
+        "accessibility"
+      ],
+      "source": "figma-mcp"
+    },
+    "uXebQLeH4VAJbjcPtYelUp#11101:839": {
+      "fileKey": "uXebQLeH4VAJbjcPtYelUp",
+      "nodeId": "11101:839",
+      "scope": "node",
+      "url": "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11101%3A839",
+      "originalUrls": [
+        "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11101%3A839"
+      ],
+      "normalizationVersion": 1,
+      "paths": {
+        "meta": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11101-839/meta.json",
+        "spec": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11101-839/spec.md",
+        "stateMap": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11101-839/state-map.md",
+        "raw": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11101-839/raw.json"
+      },
+      "syncedAt": "2026-05-12T03:33:45.560Z",
+      "completeness": [
+        "layout",
+        "text",
+        "tokens",
+        "interactions",
+        "states",
+        "accessibility"
+      ],
+      "source": "figma-mcp"
+    },
+    "uXebQLeH4VAJbjcPtYelUp#11147:1506": {
+      "fileKey": "uXebQLeH4VAJbjcPtYelUp",
+      "nodeId": "11147:1506",
+      "scope": "node",
+      "url": "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11147%3A1506",
+      "originalUrls": [
+        "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11147%3A1506"
+      ],
+      "normalizationVersion": 1,
+      "paths": {
+        "meta": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11147-1506/meta.json",
+        "spec": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11147-1506/spec.md",
+        "stateMap": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11147-1506/state-map.md",
+        "raw": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11147-1506/raw.json"
+      },
+      "syncedAt": "2026-05-12T03:34:45.085Z",
+      "completeness": [
+        "layout",
+        "text",
+        "tokens",
+        "interactions",
+        "states",
+        "accessibility"
+      ],
+      "source": "figma-mcp"
+    },
+    "uXebQLeH4VAJbjcPtYelUp#11038:687": {
+      "fileKey": "uXebQLeH4VAJbjcPtYelUp",
+      "nodeId": "11038:687",
+      "scope": "node",
+      "url": "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11038%3A687",
+      "originalUrls": [
+        "https://www.figma.com/file/uXebQLeH4VAJbjcPtYelUp/?node-id=11038%3A687"
+      ],
+      "normalizationVersion": 1,
+      "paths": {
+        "meta": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-687/meta.json",
+        "spec": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-687/spec.md",
+        "stateMap": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-687/state-map.md",
+        "raw": "figma-cache/files/uXebQLeH4VAJbjcPtYelUp/nodes/11038-687/raw.json"
+      },
+      "syncedAt": "2026-05-12T07:40:39.159Z",
+      "completeness": [
+        "layout",
+        "text",
+        "tokens",
+        "interactions",
+        "states",
+        "accessibility"
+      ],
+      "source": "figma-mcp"
+    }
+  }
 }

@@ -18,6 +18,28 @@
       "description": "Peer cacheKeys linked via index.json flows (edge.type starts with \"related\", e.g. related_auto). Hydrate refresh overwrites from current index.",
       "items": { "type": "string" }
     },
+    "figmaDataAnnotations": {
+      "type": "object",
+      "description": "Figma MCP output may include data-annotations=\"…\" on nodes (same tag as data-node-id). Hydrated from get_design_context body (not from SUPER CRITICAL trailer).",
+      "properties": {
+        "schemaVersion": { "type": "integer" },
+        "extractionMethod": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nodeId": { "type": "string" },
+              "name": { "type": "string" },
+              "text": { "type": "string" }
+            },
+            "required": ["nodeId", "text"],
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "interactionInference": {
       "type": "object",
       "description": "Heuristic UI interaction profile from MCP hydrate (not proof of runtime behavior). Prefer this field over prose in spec/state-map for analytics filtering.",
@@ -47,7 +69,8 @@
         "variableDefKeys": { "type": "integer", "minimum": 0 },
         "geometryFilePresent": { "type": "boolean" },
         "iconMetricsCount": { "type": "integer", "minimum": 0 },
-        "layoutMetricsCount": { "type": "integer", "minimum": 0 }
+        "layoutMetricsCount": { "type": "integer", "minimum": 0 },
+        "figmaDataAnnotationCount": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
     }

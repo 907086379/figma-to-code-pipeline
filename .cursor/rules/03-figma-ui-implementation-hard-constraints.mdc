@@ -14,6 +14,7 @@ alwaysApply: true
 
 ## 1) 首版必读（强制）
 - `spec.md` / `raw.json` / `state-map.md` / `mcp-raw-get-design-context.txt`
+- 若 MCP 在节点上输出了 **`data-annotations="…"`**（与 `data-node-id` 同标签）：以 **`spec.md`「Annotations（稿内 data-annotations）」** 与 **`raw.json.figmaDataAnnotations`** 为汇总入口（实现依据）；原文仍以 `mcp-raw-get-design-context.txt` 为准。
 
 ## 2) 裁决顺序（强制）
 - 信息冲突：回到 `mcp-raw-get-design-context.txt`。
@@ -39,8 +40,8 @@ alwaysApply: true
 - `role` / `aria-*` 默认不强制。
 
 ## 5) 元数据策略
-- `data-node-id` / `data-name` 默认不输出到最终业务代码。
-- 仅在调试映射模式下临时保留。
+- `data-node-id` / `data-name` 默认不输出到最终业务代码；仅在调试映射模式下临时保留。
+- Figma MCP 可能输出 **`data-annotations="…"`**（稿内设计说明，常与 `data-node-id` 同标签）：**实现前必读** hydrate 汇总（`spec.md`「Annotations」/ `raw.json.figmaDataAnnotations`）；**最终业务 DOM 默认不保留** `data-annotations`（与 `data-node-id` 策略一致；调试映射模式除外）。
 
 ## 6) 状态与交互（强制）
 - 覆盖缓存声明状态（至少 `default / expanded / selected / unselected`，若存在）。
@@ -52,7 +53,7 @@ alwaysApply: true
 
 ## 8) 证据映射（强制）
 - 交付说明至少覆盖：布局结构、核心文案、主要颜色/字体 token、状态/交互判断。
-- 每项实现事实必须给一个主来源（`raw.json/spec.md/state-map.md/mcp-raw-get-design-context.txt`）。
+- 每项实现事实必须给一个主来源（`raw.json/spec.md/state-map.md/mcp-raw-get-design-context.txt`）；稿内 **`data-annotations`** 以 **`spec.md`「Annotations」** 与 **`raw.json.figmaDataAnnotations`** 为汇总主来源（原文仍以 `mcp-raw-get-design-context.txt` 为准）。
 - 若引用 `mcp-raw`，仅用于补缺口/消歧，不重复主来源事实。
 - 若 `raw/spec` 与 `mcp-raw` 冲突，先报告冲突再给采用依据。
 

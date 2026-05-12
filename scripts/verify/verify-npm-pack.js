@@ -93,6 +93,7 @@ const REQUIRED = [
   "figma-cache/js/validate-cli.js",
   "scripts/batch-add.cjs",
   "scripts/workflow/batch-remove.cjs",
+  "scripts/workflow/mcp-ingest-argv.cjs",
   "scripts/generate-icon-insets.cjs",
   "scripts/forbidden-markup-check.cjs",
   "scripts/verify/check-cursor-shadow.js",

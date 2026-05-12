@@ -29,7 +29,9 @@
 | `fc:mcp:ingest` | 默认落盘命令：三段回包 → `mcp-raw/` + manifest → `fc:ensure` → `fc:validate` → **`fc:budget --mcp-only`**；加 **`--enrich`** 刷新当前节点派生物。 |
 | `fc:mcp:gate` | 修补用：未跑 ingest、仅改磁盘证据时全量 `validate` + `budget`；`--enrich` 为 `enrich --all`。 |
 | `tokenProxyBytes` | 基于 `mcp-raw-get-design-context.txt` 文件大小的 token 代理指标。 |
+| `data-annotations` | 设计说明可出现在 MCP 生成代码的标签属性中；`fc:ensure` 会汇总到 `spec.md`「Annotations」与 `raw.json.figmaDataAnnotations`。 |
 | `flow` | 业务流程关系（多屏顺序/分支），维护在 `index.json.flows`。 |
+| URL 中的 `&`（Windows） | `fc:mcp:ingest` 会尝试自动拼回被 cmd 拆开的查询段；备选见主文档 **「Windows / shell：`--url` 中的 `&`」** 与 **`FIGMA_MCP_INGEST_URL`**。 |
 
 ---
 
@@ -48,6 +50,7 @@
 
 - **同事**：Figma 链接 + 任务目标；前后页/分支/跳转写在同一条需求里；要最新稿写「强制刷新」。
 - **Agent / 脚本**：缓存优先 → 按需 MCP → **`npm run fc:mcp:ingest:quiet`**；完整链路与主提示词见 **主文档「一页速查」**。
+- **Windows + 含 `&` 的链接**：`fc:mcp:ingest` 会**自动拼接**被 cmd 拆开的 `key=value` 查询段到 `--url`；仍失败可用 **`--url-file`** / **`FIGMA_MCP_INGEST_URL`** / **`--file-key`+`--node-id`**。详见主文档 **「Windows / shell：`--url` 中的 `&`」**。
 
 ---
 

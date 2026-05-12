@@ -30,6 +30,7 @@
  *                          写入三段文件与 .fc-mcp-ingest-staging 标记；链路成功后必定删除（脚本自有目录）
  *
  * 也可用 --file-key + --node-id（11069:3124 或 11069-3124）代替 --url。
+ * Windows：npm 经 cmd 时 `&m=dev` 可能被拆成独立 argv；本脚本在解析前会把后续 `key=value` 片段自动拼回 `--url`（见 `mcp-ingest-argv.cjs`）。未传 `--url` 时还可读环境变量 `FIGMA_MCP_INGEST_URL` 或 `--url-file`（单行 URL）。
  *
  * 失败时（含参数/输入校验与 gate 子进程）写入 `figma-cache/reports/runtime/mcp-ingest-failure.json` 与 `mcp-ingest-last.log`，终端一行 `fc:mcp:ingest fail ... log=... json=...`；JSON 含 `failureKind`: `preflight`（落盘前）或 `gate`（ensure/validate/budget/enrich）。
  *
@@ -45,6 +46,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { URL } = require("url");
 const { parseCli } = require("../cli-args.cjs");
+const { coalesceFigmaMcpIngestArgvSlice } = require("./mcp-ingest-argv.cjs");
 const { sanitizeDesignContextTextForCache } = require("../sanitize-design-context-for-cache.cjs");
 const { writeMcpIngestFailureArtifact } = require("./mcp-ingest-failure-artifact.cjs");
 
@@ -311,6 +313,7 @@ function parseArgs(argv) {
   const { values, flags, unknown } = parseCli(argv, {
     strings: [
       "url",
+      "url-file",
       "file-key",
       "node-id",
       "cache-dir",
@@ -358,7 +361,8 @@ function inferCacheKeyStr(values, target) {
 }
 
 function ingestCommandLine() {
-  return process.argv
+  const merged = [process.argv[0], process.argv[1], ...coalesceFigmaMcpIngestArgvSlice(process.argv.slice(2))];
+  return merged
     .slice(1)
     .map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a))
     .join(" ");
@@ -385,7 +389,20 @@ function failPreflight({ values, target, stage, message, exitCode = 1, stdout = 
 }
 
 function resolveTargetUrl(values) {
-  const urlRaw = (values.url || "").trim();
+  let urlRaw = (values.url || "").trim();
+  if (!urlRaw) {
+    urlRaw = (process.env.FIGMA_MCP_INGEST_URL || "").trim();
+  }
+  if (!urlRaw) {
+    const uf = (values["url-file"] || "").trim();
+    if (uf) {
+      const abs = resolvePath(uf);
+      if (!abs || !fs.existsSync(abs)) {
+        throw new Error(`--url-file not found or empty: ${uf}`);
+      }
+      urlRaw = fs.readFileSync(abs, "utf8").split(/\r?\n/)[0].trim();
+    }
+  }
   const fk = (values["file-key"] || "").trim();
   const nidRaw = (values["node-id"] || "").trim();
 
@@ -398,7 +415,7 @@ function resolveTargetUrl(values) {
     const synthetic = `https://www.figma.com/design/${fk}/_/dummy?node-id=${encodeURIComponent(dashed)}`;
     return normalizeFigmaUrl(synthetic);
   }
-  throw new Error("Provide --url or both --file-key and --node-id");
+  throw new Error("Provide --url, or --url-file, or env FIGMA_MCP_INGEST_URL, or both --file-key and --node-id");
 }
 
 function printUsage() {
@@ -413,6 +430,8 @@ Usage:
 
 Options:
   --file-key / --node-id   代替 --url（node-id 可为 12:34 或 12-34）
+  --url-file=<path>        从文件首行读取 URL（避免 shell 对 & 拆词）；与 --url 二选一
+  （环境变量 FIGMA_MCP_INGEST_URL：未传 --url 时作为 URL，同样可绕开 cmd 对 & 的解析）
   --cache-dir              缓存根目录（默认 ./figma-cache 或环境变量 FIGMA_CACHE_DIR）
   --mcp-server             写入 manifest.mcp-server（默认 user-Figma）
   --no-sanitize            不消毒 design context（默认执行 sanitize-design-context-for-cache）
@@ -496,7 +515,8 @@ function failIngest({
 }
 
 function main() {
-  const parsed = parseArgs(process.argv);
+  const coalescedArgv = [process.argv[0], process.argv[1], ...coalesceFigmaMcpIngestArgvSlice(process.argv.slice(2))];
+  const parsed = parseArgs(coalescedArgv);
   if (parsed.help) {
     printUsage();
     process.exit(0);

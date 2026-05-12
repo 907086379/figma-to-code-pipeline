@@ -39,6 +39,9 @@ figma-cache/files/
 # --- 移动规格派生物（不入库）---
 figma-cache/mobile-specs/
 
+# --- MCP ingest 本地 staging（勿提交）---
+ingest-staging-*/
+
 # --- 操作系统 ---
 .DS_Store
 Thumbs.db

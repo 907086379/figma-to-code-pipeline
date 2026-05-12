@@ -194,6 +194,7 @@ const entryFilesService = createEntryFilesService({
   normalizeCompletenessList,
   completenessAllDimensions: COMPLETENESS_ALL_DIMENSIONS,
   runPostEnsureHook,
+  cacheDir: CACHE_DIR,
   getRelatedCacheKeys: (cacheKey) =>
     getRelatedCacheKeysFromIndex(cacheKey, normalizeIndexShape(readIndex())),
 });

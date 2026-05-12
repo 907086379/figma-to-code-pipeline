@@ -33,6 +33,12 @@ npm run fc:mcp:ingest:quiet -- --url="<含 node-id 的 Figma 链接>" \
 
 默认行为：写入约定文件名、`mcp-raw-manifest.json`（sha256 / size / toolCalls），并串联 **`fc:ensure --source=figma-mcp`** → **`fc:validate`** → **`fc:budget --mcp-only`**。成功路径推荐 **`npm run fc:mcp:ingest:quiet`**（内置 `--quiet`，末行仅摘要）。需要刷新派生物时在**同一条命令**上加 **`--enrich`**。可用 **`--skip-budget`** 跳过 budget（少见）。完整选项：`npm run fc:mcp:ingest -- --help`。
 
+### 稿内标注 `data-annotations`（与 MCP 尾部消毒）
+
+- Figma MCP 常在生成标签上与 `data-node-id` 并列输出 **`data-annotations="…"`**（设计说明写在代码属性里，而非单独附录文件）。
+- **`fc:mcp:ingest` 默认消毒**只裁掉从 **`SUPER CRITICAL:`** 起到文末的 MCP 说明尾，**不会**去掉组件主体里的 `data-annotations`。
+- **`fc:ensure` hydrate** 会从 `mcp-raw-get-design-context.txt` 扫描这些属性，写入 **`spec.md` 的「Annotations（稿内 data-annotations）」** 与 **`raw.json.figmaDataAnnotations`**（并在 `raw.json.evidenceSummary.figmaDataAnnotationCount` 计数），便于 Agent/研发首轮必读。
+
 ### `fc:mcp:gate`（仅修补场景）
 
 走 **`fc:mcp:ingest` 时不必再跑 gate**。仅在 **手工改了磁盘上的 `mcp-raw/`、未执行 ingest** 时，用 gate 做全索引 **`validate` + `fc:budget --mcp-only`**；需要 **`enrich --all`** 时用 `npm run fc:mcp:gate -- --enrich`。详见 `npm run fc:mcp:gate -- --help`。
@@ -65,6 +71,17 @@ npm run fc:get -- "<figma-url>"
 npm run fc:validate
 npm run fc:budget
 ```
+
+### Windows / shell：`--url` 中的 `&`（例如 `&m=dev`）
+
+**脚本已自动处理（默认）**：`fc:mcp:ingest` 在解析参数前会把紧跟在 `--url=…` / `--url …` 之后、形如 **`key=value`** 的独立 argv（常见为 **`m=dev`**）拼回 URL，仅在已识别为 **`figma.com` 且含 `node-id=`** 时生效（实现见 `scripts/workflow/mcp-ingest-argv.cjs`）。因此 **`npm run fc:mcp:ingest:quiet -- --url=…?node-id=…&m=dev`** 在多数 Windows/cmd 拆词场景下可直接成功。
+
+**仍失败或需完全绕开 shell 时的备选**：
+
+1. **`--url-file=<path>`**：文件首行写完整 URL（UTF-8）。
+2. **环境变量 `FIGMA_MCP_INGEST_URL`**：不设 `--url`，由进程环境提供整串 URL。
+3. **`--file-key` + `--node-id`**：不传含 `&` 的长 URL。
+4. **手工精简 URL**：去掉 `&` 及之后参数（`node-id` 已足够 ingest 定位）。
 
 ---
 
@@ -324,6 +341,7 @@ npm run fc:init
 | `FIGMA_ITERATIONS_DIR` | **仅** `backfill` 扫描的历史 Markdown 目录；不存在时扫描为空，`validate` 不受影响 |
 | `FIGMA_CACHE_STALE_DAYS` | 陈旧阈值（天） |
 | `FIGMA_DEFAULT_FLOW` | 默认 `flowId`（大迭代推荐设置） |
+| `FIGMA_MCP_INGEST_URL` | **`fc:mcp:ingest` 专用**：整串 Figma URL（可含 `&`）；未传 `--url` 时使用，避免 cmd 对命令行中 `&` 的拆词 |
 | `FIGMA_CACHE_ADAPTER_DOC` | 覆盖 adapter 提示文档基础名（默认 `figma-cache-adapter-hint.md`） |
 | `FIGMA_CACHE_ADAPTER_DOC_MODE` | adapter 提示写入模式：`cache-root`（默认，目录级单文件）/ `node`（按节点）/ `off`（关闭） |
 | `FIGMA_CACHE_ADAPTER_DOC_CACHE` | `cache-root` 模式下 adapter 提示文档路径（相对项目根，默认 `figma-cache/docs/figma-cache-adapter-hint.md`） |

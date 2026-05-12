@@ -1,6 +1,10 @@
 /* eslint-disable no-console */
 
-const { mergeLayoutMetricsFromGeometry, buildEvidenceSummary } = require("./raw-derivatives");
+const {
+  mergeLayoutMetricsFromGeometry,
+  buildEvidenceSummary,
+  extractFigmaDataAnnotationsFromDesignContext,
+} = require("./raw-derivatives");
 const { itemCacheKeyFromItem } = require("./related-cache-keys");
 
 function createEntryFilesService(deps) {
@@ -12,7 +16,25 @@ function createEntryFilesService(deps) {
     completenessAllDimensions,
     runPostEnsureHook,
     getRelatedCacheKeys,
+    cacheDir = "",
   } = deps;
+
+  /** hydrate raw.json 失败时落盘，避免静默吞错；路径在 figma-cache/reports/runtime/（通常 gitignore） */
+  function appendMcpHydrateRuntimeLog(item, err) {
+    const root = String(cacheDir || "").trim();
+    if (!root) return;
+    try {
+      const dir = path.join(root, "reports", "runtime");
+      fs.mkdirSync(dir, { recursive: true });
+      const logPath = path.join(dir, "mcp-hydrate-last.log");
+      const ts = new Date().toISOString();
+      const cacheKey = item ? `${item.fileKey || ""}#${item.nodeId || ""}` : "(unknown)";
+      const body = err && err.stack ? String(err.stack) : String(err);
+      fs.appendFileSync(logPath, `[${ts}] ${cacheKey}\n${body}\n\n`, "utf8");
+    } catch (logErr) {
+      console.error("[figma-cache] mcp hydrate runtime log failed:", logErr && logErr.message);
+    }
+  }
 
   function ensureFileWithDefault(relativePath, fallbackContent) {
     const absPath = resolveMaybeAbsolutePath(relativePath);
@@ -313,11 +335,31 @@ function createEntryFilesService(deps) {
     };
   }
 
+  function buildAnnotationsSpecSection(annRecord) {
+    const items = annRecord && Array.isArray(annRecord.items) ? annRecord.items : [];
+    if (!items.length) {
+      return `- 未在 get_design_context 中解析到 \`data-annotations="…"\`（MCP 未输出或节点无标注）。设计说明请见稿或人工补本节。\n`;
+    }
+    return (
+      items
+        .map((it) => {
+          const id = it.nodeId ? `\`${it.nodeId}\`` : "（无 node-id）";
+          const nm = it.name ? ` **${it.name}**` : "";
+          const body = String(it.text || "")
+            .replace(/\r?\n/g, " ")
+            .trim();
+          return `- ${id}${nm}: ${body}`;
+        })
+        .join("\n") + "\n"
+    );
+  }
+
   function buildMcpHydratedSpecContent(item, evidence, profileMaybe) {
     const completeness = normalizeCompletenessList(item.completeness);
     const layout = extractLayoutSummary(evidence.metadataText, item.nodeId || "N/A");
     const textItems = extractTextCandidates(evidence.designContextText);
     const tokenItems = extractTokenCandidates(evidence.variableDefs);
+    const annRecord = extractFigmaDataAnnotationsFromDesignContext(evidence.designContextText);
     const textSection = textItems.length
       ? textItems.map((line) => `- ${line}`).join("\n")
       : "- 未从 get_design_context 中提取到稳定文本，建议人工补充。";
@@ -356,7 +398,7 @@ function createEntryFilesService(deps) {
       `- syncedAt: ${item.syncedAt}\n` +
       `- completeness: ${completeness.join(", ") || "N/A"}\n` +
       `- interactionProfile: ${profile.kind}（启发式）\n` +
-      `- interactionInferenceDisclaimer: 下文 Interactions/States 为自动化草稿，非设计结论；交互实证以 mcp-raw-get-design-context.txt 为准；详见 raw.json.interactionInference。\n\n` +
+      `- interactionInferenceDisclaimer: 下文 Interactions/States 为自动化草稿，非设计结论；交互实证以 mcp-raw-get-design-context.txt 为准；详见 raw.json.interactionInference。稿内 \`data-annotations\` 汇总见本节「Annotations」与 raw.json.figmaDataAnnotations。\n\n` +
       `## Layout（结构）\n\n` +
       `- node: ${layout.name} (${layout.id})\n` +
       `- position: ${layout.pos}\n` +
@@ -365,6 +407,8 @@ function createEntryFilesService(deps) {
       `${textSection}\n\n` +
       `## Tokens（变量 / 样式）\n\n` +
       `${tokenSection}\n\n` +
+      `## Annotations（稿内 data-annotations）\n\n` +
+      `${buildAnnotationsSpecSection(annRecord)}` +
       `## Interactions（交互）\n\n` +
       `${interactionsLine}\n\n` +
       `## States（状态）\n\n` +
@@ -564,6 +608,7 @@ function createEntryFilesService(deps) {
     // and evidenceSummary (observability only; not used for validate gates).
     try {
       const iconMetrics = extractIconMetricsFromDesignContext(evidence.designContextText);
+      const figmaAnn = extractFigmaDataAnnotationsFromDesignContext(evidence.designContextText);
       const rawAbs = resolveMaybeAbsolutePath(item.paths.raw);
       const nodeDir = findNodeDirByItem(item);
       const geometryAbs = nodeDir
@@ -577,9 +622,15 @@ function createEntryFilesService(deps) {
         (next) => {
           next.interactionInference = buildInteractionInferenceRecord(profile);
           next.iconMetrics = iconMetrics;
+          if (figmaAnn.items && figmaAnn.items.length) {
+            next.figmaDataAnnotations = figmaAnn;
+          } else {
+            delete next.figmaDataAnnotations;
+          }
           mergeLayoutMetricsFromGeometry(next, geometry);
           const iconN = Array.isArray(next.iconMetrics) ? next.iconMetrics.length : 0;
           const layoutN = Array.isArray(next.layoutMetrics) ? next.layoutMetrics.length : 0;
+          const annN = figmaAnn.items && figmaAnn.items.length ? figmaAnn.items.length : 0;
           next.evidenceSummary = buildEvidenceSummary({
             designContextText: evidence.designContextText,
             metadataText: evidence.metadataText,
@@ -588,6 +639,7 @@ function createEntryFilesService(deps) {
             geometryFilePresent,
             iconMetricsCount: iconN,
             layoutMetricsCount: layoutN,
+            figmaDataAnnotationCount: annN,
           });
           let relatedCacheKeys = [];
           if (typeof getRelatedCacheKeys === "function") {
@@ -605,7 +657,9 @@ function createEntryFilesService(deps) {
           return next;
         }
       );
-    } catch {}
+    } catch (e) {
+      appendMcpHydrateRuntimeLog(item, e);
+    }
   }
 
   function buildCoverageSummary(completeness) {

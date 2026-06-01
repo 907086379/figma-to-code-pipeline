@@ -6,7 +6,7 @@
  * 未知长选项进入 unknown，便于调用方硬失败或降级。
  *
  * 已接入（scripts 下）：forbidden-markup-check、ui-1to1-audit、cross-project-e2e、batch-add/remove、
- * generate-icon-insets(+batch)、archive-artifacts、ui-mount-batch、auto-link-related、apply-auto-related、
+ * generate-icon-insets(+batch)、archive-artifacts、batch-add、auto-link-related、apply-auto-related、
  * mcp-raw-ingest、mcp-raw-gate、repair-mcp-design-context-evidence、merge-figma-geometry-metrics、ui-icon-rewrite、
  * ui-preflight、ui-report-aggregate、ui-auto-acceptance、check-ui-adapter-contract、ui-icon-registry-sync、
  * mobile/generate-mobile-spec。

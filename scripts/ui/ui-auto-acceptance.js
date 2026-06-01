@@ -6,11 +6,13 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const { parseCli } = require("../cli-args.cjs");
+const { readUiBatchConfig, normalizeMountMode } = require("./ui-batch-mount.cjs");
 
 const ROOT = process.cwd();
 const SCRIPT_DIR = __dirname;
 const CACHE_DIR_INPUT = process.env.FIGMA_CACHE_DIR || "figma-cache";
 const FAIL_EXIT_CODE = 2;
+const DEFAULT_BATCH_FILE = "figma-e2e-batch.json";
 
 function normalizeNodeId(input) {
   const v = String(input || "").trim();
@@ -67,6 +69,8 @@ function parseArgs(argvSlice) {
       "preflight-report",
       "audit-report",
       "summary-report",
+      "mount-mode",
+      "batch",
     ],
     booleanFlags: ["reports-only"],
   });
@@ -83,6 +87,8 @@ function parseArgs(argvSlice) {
     preflightReport: (values["preflight-report"] || "").trim(),
     auditReport: (values["audit-report"] || "").trim(),
     summaryReport: (values["summary-report"] || "").trim(),
+    mountMode: (values["mount-mode"] || "").trim(),
+    batch: (values.batch || "").trim(),
   };
   const n = (k, def) => {
     const v = (values[k] || "").trim();
@@ -104,6 +110,24 @@ function parseArgs(argvSlice) {
     if (t) options.target = t.trim();
   }
   return options;
+}
+
+function readBatchCase(cacheKey, batchPathInput) {
+  const batchPath = resolveMaybeAbsolutePath(batchPathInput || DEFAULT_BATCH_FILE);
+  const payload = readJsonOrNull(batchPath);
+  if (!payload || typeof payload !== "object" || !Array.isArray(payload.cases)) {
+    return { batchPath, item: null };
+  }
+  const ck = String(cacheKey || "").trim();
+  const item =
+    payload.cases.find((entry) => {
+      const fk = String(entry && entry.designRef && entry.designRef.fileKey ? entry.designRef.fileKey : "").trim();
+      const nidRaw = String(entry && entry.designRef && entry.designRef.nodeId ? entry.designRef.nodeId : "").trim();
+      if (!fk || !nidRaw) return false;
+      const nid = normalizeNodeId(nidRaw);
+      return `${fk}#${nid}` === ck;
+    }) || null;
+  return { batchPath, item };
 }
 
 function runOrExit(command) {
@@ -201,6 +225,14 @@ function evaluate(preflight, audit, summary, options) {
     }
   }
 
+  if (options.mountMode === "auto") {
+    if (!options.mountPage) {
+      failures.push("mountMode=auto but mountPage is empty");
+    } else if (!options.mountPageExists) {
+      failures.push(`mountMode=auto but mountPage not found (${options.mountPage})`);
+    }
+  }
+
   return {
     ok: failures.length === 0,
     failures,
@@ -210,6 +242,26 @@ function evaluate(preflight, audit, summary, options) {
 
 function run() {
   const options = parseArgs(process.argv.slice(2));
+  const uiBatchWrap = readUiBatchConfig(ROOT);
+  const uiBatchConfig = uiBatchWrap.config;
+  options.mountMode = normalizeMountMode(
+    options.mountMode ||
+      process.env.FIGMA_UI_BATCH_MOUNT_MODE ||
+      (uiBatchConfig && (uiBatchConfig.mountMode || uiBatchConfig.mount)
+        ? uiBatchConfig.mountMode || uiBatchConfig.mount
+        : "")
+  );
+
+  const batchCase = readBatchCase(options.cacheKey, options.batch);
+  if (!options.target && batchCase.item && batchCase.item.target && batchCase.item.target.entry) {
+    options.target = String(batchCase.item.target.entry || "").trim();
+  }
+  const mountMeta = batchCase.item && batchCase.item.mount ? batchCase.item.mount : null;
+  options.mountPage = mountMeta && mountMeta.mountPage ? String(mountMeta.mountPage).trim() : "";
+  options.mountPageExists = options.mountPage
+    ? fs.existsSync(resolveMaybeAbsolutePath(options.mountPage))
+    : false;
+
   const target = options.target ? resolveMaybeAbsolutePath(options.target) : "";
   const contract = options.contract
     ? resolveMaybeAbsolutePath(options.contract)
@@ -327,6 +379,9 @@ function run() {
     options: {
       cacheKey: options.cacheKey || null,
       target: target || null,
+      mountMode: options.mountMode,
+      mountPage: options.mountPage || null,
+      mountPageExists: options.mountPage ? options.mountPageExists : null,
       minScore: options.minScore,
       maxWarnings: options.maxWarnings,
       maxDiffs: options.maxDiffs,

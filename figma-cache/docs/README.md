@@ -161,9 +161,21 @@ npm run fc:config
 - `npm run fc:budget`（默认 `--mcp-only`）
 - `npm run fc:stale`
 - `npm run fc:backfill`
+- `npm run fc:doctor`（UI batch 兼容诊断：route mode / targetRoot 风险 / mountMode 与 mountPage 可用性；`--strict` 仅拦 blocking findings，缺 config 为 advisory）
 > 注意：`ensure` 默认职责是“写索引 + 生成骨架文件”，不是 MCP 拉取器。  
 > 当 `upsert/ensure` 传 `--source=figma-mcp` 且未显式允许骨架模式时，CLI 会先执行 MCP 原始证据门禁（缺失即失败，退出码 2）。
 > 正确流程是先由 Agent/Figma MCP 获取最小调用集并写入 `mcp-raw/`（推荐 **`fc:mcp:ingest:quiet`** / **`fc:mcp:ingest`**，已含 `validate` 与 `budget`）。**`fc:mcp:gate`** 仅用于未走 ingest 的修补（见上文「一页速查」）。
+
+### auto-routes 友好默认（新增）
+
+- 推荐 profile：`vue3-vite-auto-routes-tailwind`
+- 默认 `targetRoot`：`./src/components/figma-batch`（避免写入 `src/pages/**`）
+- 默认 `mountMode`：`manual`（只登记 batch + 写 `target.entry` 组件，**不**自动改业务页面）
+- Agent 典型链路：`fc:mcp:ingest(:quiet)` → `fc:batch:add` → 实现 `target.entry` → `fc:ui:preflight` / `fc:ui:accept`
+- 更新已有 case：未显式 `--target` / `--target-root` 时保留原 `target.entry`（防静默漂移）
+- 需要预览页联调时显式设置：`mountMode=auto`（并提供或探测 `mountPage`）；**无** `ui-mount-batch --all`
+- 可通过 `--profile` / `FIGMA_UI_BATCH_PROFILE` / `figma-ui-batch.config.json` 覆盖
+- 常见风险：auto-routes 项目勿把 batch 产物写入 `src/pages/**`；PowerShell 传 Figma URL 时注意 `&` 引号
 
 ### Fresh 重生成回归（推荐）
 
@@ -229,6 +241,9 @@ npm run fc:config
 
 - `npm run fc:ui:accept -- --cacheKey=<fileKey#nodeId> --target=<componentPath> --min-score=90`
 - 自动流程：preflight -> audit -> aggregate -> 验收判定
+- 挂载策略：
+  - `mountMode=manual/off`：代码级验收（只校验 target 组件实现）
+  - `mountMode=auto`：额外校验 batch 中 `mount.mountPage` 是否存在
 - 默认严格判定：
   - preflight 必须无 blocking
   - audit score 不低于阈值

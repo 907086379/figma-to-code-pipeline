@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- **UI batch 语义统一（Agent 驱动）**：`figma-cache/docs/ui-batch-v2-spec-zh.md`、`docs/README.md` 与规则模板统一为 `fc:mcp:ingest(:quiet) -> fc:batch:add -> target.entry 实现 -> fc:ui:preflight/fc:ui:accept`，默认 `mountMode=manual` 不自动改业务页面，移除 `ui-mount-batch --all` 口径。
+- **`batch-add` 防静默路径漂移**：更新已有 case 且未显式传 `--target`/`--target-root` 时保留原 `target.entry`；显式传参时才迁移。新增 `scripts/ui/ui-batch-mount.cjs` 抽取 profile/mount/doctor/target 解析逻辑，并增加 `target.entry.source` 输出。
+- **诊断与测试增强**：新增 `fc:doctor`（`scripts/doctor/ui-batch-doctor.cjs`）与 `tests/ui-batch-mount.test.js`、`tests/batch-add-target-entry.integration.test.js`；`test:node` 已串联新测试。
+
 ## 4.2.0（2026-05-07）
 
 - **`fc:mcp:ingest`**：任意非 0 退出均写入 **`figma-cache/reports/runtime/`**（`mcp-ingest-last.log` / `mcp-ingest-failure.json`），终端固定 **`log=`** / **`json=`**；JSON 字段 **`failureKind`** 区分 **`preflight`**（落盘前校验）与 **`gate`**（ensure / validate / budget / enrich 子进程）。

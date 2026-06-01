@@ -24,10 +24,18 @@ const fs = require("fs");
 const path = require("path");
 const { parseCli } = require("./cli-args.cjs");
 const { readBatchV2, writeBatchV2, normalizeNodeIdToBatch } = require("./ui/ui-batch-v2.cjs");
+const {
+  DEFAULT_UI_BATCH_ROOT,
+  readUiBatchConfig,
+  resolveUiBatchProfile,
+  normalizeTargetRoot,
+  collectTargetDeprecationWarnings,
+  resolveMountStrategy,
+  resolveBatchTargetEntry,
+} = require("./ui/ui-batch-mount.cjs");
 
 const ROOT = process.cwd();
 const DEFAULT_BATCH = "figma-e2e-batch.json";
-const DEFAULT_UI_BATCH_CONFIG = "figma-ui-batch.config.json";
 const DEFAULT_MCP_RAW_FILE = "mcp-raw-get-design-context.txt";
 const DEFAULT_RELATIONS_REPORT = "figma-cache/reports/runtime/component-relations.json";
 const DEFAULT_SUGGESTIONS_REPORT = "figma-cache/reports/runtime/component-engineering-suggestions.json";
@@ -47,21 +55,8 @@ function safeReadText(absPath) {
   }
 }
 
-function readUiBatchConfig() {
-  const configPath = path.join(ROOT, DEFAULT_UI_BATCH_CONFIG);
-  const raw = readJsonIfExists(configPath);
-  if (!raw || typeof raw !== "object") {
-    return { configPath, config: null };
-  }
-  const config = raw && raw.uiBatch && typeof raw.uiBatch === "object" ? raw.uiBatch : raw;
-  if (!config || typeof config !== "object") {
-    return { configPath, config: null };
-  }
-  return { configPath, config };
-}
-
 function resolveNamingConfig() {
-  const { config } = readUiBatchConfig();
+  const { config } = readUiBatchConfig(ROOT);
   const naming = config && config.naming && typeof config.naming === "object" ? config.naming : {};
   return {
     enabled: naming.enabled !== false,
@@ -138,6 +133,11 @@ function tryParseNodeIdOnly(input) {
   return undefined;
 }
 
+function argvHasExplicitOption(argv, names) {
+  const args = Array.isArray(argv) ? argv.slice(2) : [];
+  return names.some((name) => args.some((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`)));
+}
+
 function parseArgs() {
   const { values, flags, positionals } = parseCli(process.argv, {
     strings: [
@@ -148,6 +148,9 @@ function parseArgs() {
       "target-root",
       "component",
       "kind",
+      "profile",
+      "mount",
+      "mount-mode",
       "minScore",
       "maxWarnings",
       "maxDiffs",
@@ -165,6 +168,8 @@ function parseArgs() {
     targetRoot: (values["target-root"] || "").trim(),
     component: (values.component || "").trim(),
     kind: (values.kind || "").trim() || "vue",
+    profile: (values.profile || "").trim(),
+    mountMode: (values["mount-mode"] || values.mount || "").trim(),
     minScore: undefined,
     maxWarnings: undefined,
     maxDiffs: undefined,
@@ -173,6 +178,8 @@ function parseArgs() {
     noAutoName: !!flags["no-auto-name"],
     noRelationsReport: !!flags["no-relations-report"],
     noSuggestionsReport: !!flags["no-suggestions-report"],
+    explicitTarget: argvHasExplicitOption(process.argv, ["target"]),
+    explicitTargetRoot: argvHasExplicitOption(process.argv, ["target-root"]),
   };
   const nid = (values.nodeId || "").trim();
   if (nid) out.nodeId = normalizeNodeIdForBatch(nid);
@@ -637,12 +644,6 @@ function defaultComponentName(nodeIdBatch) {
   return `FigmaNode${safe || "Unknown"}`;
 }
 
-function normalizeTargetRoot(input) {
-  const raw = String(input || "").trim().replace(/\\/g, "/");
-  if (!raw) return "";
-  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
-}
-
 function renderTargetTemplate(template, vars) {
   const raw = String(template || "");
   if (!raw) return "";
@@ -654,19 +655,20 @@ function renderTargetTemplate(template, vars) {
     .replace(/\{nodeId\}/g, String(vars.nodeId || ""));
 }
 
-function resolveTarget({ target, component, nodeId, targetRoot }) {
-  if (target) return target;
+function resolveTarget({ target, component, nodeId, targetRoot, config, preset }) {
+  if (target) return { entry: target, targetRoot: "" };
   const comp = component || defaultComponentName(nodeId);
-  const { config } = readUiBatchConfig();
   const resolvedRoot =
     normalizeTargetRoot(targetRoot) ||
     normalizeTargetRoot(process.env.FIGMA_UI_BATCH_TARGET_ROOT) ||
     normalizeTargetRoot(config && config.targetRoot) ||
-    "./src/pages/main/components";
+    normalizeTargetRoot(preset && preset.targetRoot) ||
+    DEFAULT_UI_BATCH_ROOT;
 
   const resolvedTemplate =
     String(process.env.FIGMA_UI_BATCH_TARGET_TEMPLATE || "").trim() ||
     String(config && config.targetTemplate ? config.targetTemplate : "").trim() ||
+    String(preset && preset.targetTemplate ? preset.targetTemplate : "").trim() ||
     "{targetRoot}/{component}/index.vue";
 
   const rendered = renderTargetTemplate(resolvedTemplate, {
@@ -676,18 +678,18 @@ function resolveTarget({ target, component, nodeId, targetRoot }) {
   }).replace(/\\/g, "/");
 
   if (!rendered || !rendered.includes(String(comp))) {
-    // Safety fallback: never emit an empty / suspicious target.
-    return `${resolvedRoot}/${comp}/index.vue`;
+    return { entry: `${resolvedRoot}/${comp}/index.vue`, targetRoot: resolvedRoot };
   }
 
-  return rendered;
+  return { entry: rendered, targetRoot: resolvedRoot };
 }
 
 function emptyBatchV2() {
   return { version: 2, cases: [] };
 }
 
-function upsertCaseV2(batchPayload, nextCase) {
+function upsertCaseV2(batchPayload, nextCase, options) {
+  const clearMount = !!(options && options.clearMount);
   const base =
     batchPayload && typeof batchPayload === "object" && !Array.isArray(batchPayload) ? batchPayload : emptyBatchV2();
   const cases = Array.isArray(base.cases) ? [...base.cases] : [];
@@ -701,10 +703,18 @@ function upsertCaseV2(batchPayload, nextCase) {
       String(x.designRef.nodeId || "").trim() === nid
   );
   if (idx >= 0) {
-    cases[idx] = { ...cases[idx], ...nextCase };
+    const merged = { ...cases[idx], ...nextCase };
+    if (clearMount) {
+      delete merged.mount;
+    }
+    cases[idx] = merged;
     return { payload: { ...base, version: 2, cases }, action: "updated" };
   }
-  cases.push(nextCase);
+  const added = { ...nextCase };
+  if (clearMount) {
+    delete added.mount;
+  }
+  cases.push(added);
   return { payload: { ...base, version: 2, cases }, action: "added" };
 }
 
@@ -728,6 +738,7 @@ function findCaseByDesignRef(batchPayload, fileKey, nodeIdBatch) {
 function main() {
   const args = parseArgs();
   const namingConfig = resolveNamingConfig();
+  const { config } = readUiBatchConfig(ROOT);
   if (!args.input) {
     console.error(
       [
@@ -739,11 +750,14 @@ function main() {
         "- 若传 --component，必须严格 PascalCase（A-Z 开头，后续仅字母数字）。",
         "",
         "target.entry 路径：",
-        "- 默认写入 ./src/pages/main/components/<Component>/index.vue（kind=vue）",
+        "- 默认写入 ./src/components/figma-batch/<Component>/index.vue（kind=vue）",
         "- 你可以用 --target 显式指定 entry，或用 --target-root 改根目录",
+        "- 更新已有 case 时：未显式传 --target/--target-root 则保留原 target.entry，避免静默漂移",
         "- 可设置环境变量 FIGMA_UI_BATCH_TARGET_ROOT 避免重复传 --target-root",
+        "- 可设置 --profile 或 FIGMA_UI_BATCH_PROFILE（示例：vue3-vite-auto-routes-tailwind）",
+        "- 可设置 --mount=auto|manual|off（默认 manual，仅生成组件不挂载）",
         "- 工程化配置：在项目根新增 figma-ui-batch.config.json：",
-        '  { "uiBatch": { "targetRoot": "./src/ui/components", "targetTemplate": "{targetRoot}/{component}/index.vue" } }',
+        '  { "uiBatch": { "profile": "vue3-vite-auto-routes-tailwind", "targetRoot": "./src/components/figma-batch", "targetTemplate": "{targetRoot}/{component}/index.vue", "mountMode": "manual" } }',
         "- 环境变量覆盖模板：FIGMA_UI_BATCH_TARGET_TEMPLATE",
         "",
         "示例：",
@@ -791,6 +805,12 @@ function main() {
   }
 
   const kind = String(args.kind || "").trim() || "vue";
+  const profile = resolveUiBatchProfile(config, args.profile, kind);
+  if (profile.fallback) {
+    console.warn(
+      `[batch-add] unknown profile "${profile.name}", fallback preset: ${profile.fallbackTo}.`
+    );
+  }
   if (!["vue", "react", "html"].includes(kind)) {
     console.error(`invalid --kind (must be vue|react|html). received: ${JSON.stringify(args.kind)}`);
     process.exit(2);
@@ -839,17 +859,44 @@ function main() {
   }
 
   const componentForTarget = resolvedComponent || defaultComponentName(nodeIdBatch);
-  const target = resolveTarget({
+  const resolvedTarget = resolveTarget({
     target: args.target,
     component: componentForTarget,
     nodeId,
     targetRoot: args.targetRoot,
+    config,
+    preset: profile.preset,
   });
+  const targetResolution = resolveBatchTargetEntry({
+    existingCase,
+    explicitTarget: args.explicitTarget,
+    explicitTargetRoot: args.explicitTargetRoot,
+    explicitTargetValue: args.target,
+    resolvedFromTemplate: resolvedTarget,
+  });
+  const targetEntry = targetResolution.entry;
+  const targetRootForWarn = targetResolution.targetRootForWarn;
+
+  for (const line of collectTargetDeprecationWarnings({
+    targetRoot: targetRootForWarn || args.targetRoot || (config && config.targetRoot) || profile.preset.targetRoot,
+    targetEntry,
+    explicitTarget: args.explicitTarget,
+  })) {
+    console.warn(line);
+  }
+
+  const mountStrategy = resolveMountStrategy(ROOT, config, profile.preset, kind, args.mountMode);
+  if (mountStrategy.enabled && !mountStrategy.exists) {
+    console.warn(
+      `[batch-add] mountPage not found, fallback selected: ${mountStrategy.mountPage} (source=${mountStrategy.from}).`
+    );
+  }
 
   const itemV2 = {
     id: `${kind}-${fileKey}-${nodeIdBatch}`,
     designRef: { fileKey, nodeId: nodeIdBatch },
-    target: { kind, entry: target, assets: [] },
+    target: { kind, entry: targetEntry, assets: [] },
+    toolchain: { profile: profile.fallback ? profile.fallbackTo : profile.name },
     audit: { mode: kind === "html" ? "html-partial" : "web-strict" },
     limits: {
       minScore: Number.isFinite(Number(args.minScore))
@@ -883,6 +930,7 @@ function main() {
           : autoContext.namingInfo
           ? "toolchain-auto-from-mcp-raw"
           : "toolchain-fallback-node-id",
+      profile: profile.fallback ? profile.fallbackTo : profile.name,
     },
     signals: {
       iconSemanticKeys: engineeringSignals.iconSemanticKeys,
@@ -891,7 +939,15 @@ function main() {
     },
   };
 
-  const { payload, action } = upsertCaseV2(existing, itemV2);
+  if (mountStrategy.enabled) {
+    itemV2.mount = {
+      mountPage: mountStrategy.mountPage,
+      mode: "inject",
+      marker: `${kind}-${fileKey}-${nodeIdBatch}`,
+    };
+  }
+
+  const { payload, action } = upsertCaseV2(existing, itemV2, { clearMount: !mountStrategy.enabled });
   writeBatchV2(batchAbs, ROOT, payload);
 
   if (namingConfig.writeRelationsReport && !args.noRelationsReport) {
@@ -939,7 +995,22 @@ function main() {
     console.log(`[batch-add] signals.primitives: ${itemV2.signals.primitiveCandidates.length}`);
   }
   console.log(`[batch-add] target.kind: ${kind}`);
+  if (targetResolution.source === "preserve-existing") {
+    console.log(`[batch-add] target.entry.source: preserve-existing (kept existing target.entry)`);
+  } else if (targetResolution.source === "explicit-migrate") {
+    const via = args.explicitTarget ? "--target" : "--target-root";
+    console.log(`[batch-add] target.entry.source: explicit-migrate (${via})`);
+  } else {
+    console.log("[batch-add] target.entry.source: resolved-default");
+  }
   console.log(`[batch-add] target.entry: ${itemV2.target.entry}`);
+  console.log(`[batch-add] target.profile: ${itemV2.toolchain.profile}`);
+  console.log(`[batch-add] mount.mode: ${mountStrategy.mountMode}`);
+  if (mountStrategy.enabled) {
+    console.log(`[batch-add] mount.page: ${itemV2.mount.mountPage}`);
+  } else {
+    console.log("[batch-add] mount.page: <disabled>");
+  }
 }
 
 main();

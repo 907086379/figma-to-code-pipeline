@@ -6,7 +6,25 @@
 
 - **破坏性更新**：本 v2 与旧格式不兼容；工具链脚本只支持 v2。
 - **批量文件名固定**：仍使用 `figma-e2e-batch.json`。
-- **目标**：同一套 batch 同时支持多框架 target + 多种 mount + 审计模式差异化。
+- **目标**：同一套 batch 同时支持多框架 target + 多种 mount 元数据 + 审计模式差异化。
+- **落地方式**：端到端由 **Agent/脚本链路** 驱动（非“一键自动改业务页面”）。典型顺序：`fc:mcp:ingest(:quiet)` → `fc:batch:add`（`batch-add.cjs`）→ 按 `target.entry` 生成/修复组件 → `fc:ui:preflight` → `fc:ui:accept` / `fc:ui:accept:batch`。
+
+---
+
+## 0. 端到端流程（Agent 驱动）
+
+| 阶段 | 命令/脚本 | 作用 |
+| --- | --- | --- |
+| 设计证据 | `fc:mcp:ingest` / `fc:mcp:ingest:quiet` | MCP 三段落盘 + ensure/validate/budget |
+| 登记 batch | `fc:batch:add`（`batch-add.cjs`） | 写入/更新 `figma-e2e-batch.json` 的 `designRef` / `target` / `limits` 等 |
+| 实现产物 | Agent 按 `target.entry` 写 Vue/React/HTML | **不**默认修改业务路由页 |
+| 验收 | `fc:ui:preflight`、`fc:ui:accept`、`fc:ui:gate*` | 对照缓存事实与门禁 |
+
+约定：
+
+- **默认 `mountMode=manual`**：`batch-add` **不**向业务页面做 inject；`mount` 字段通常不写入 batch。
+- **`mount` 仅为 batch 元数据**（可选）：描述联调时“希望挂载到哪一页”；实际是否改页面由 Agent 或显式 `mountMode=auto` 策略决定，**无** `ui-mount-batch --all` 一类批量改页命令。
+- **更新已有 case**：未显式传 `--target` / `--target-root` 时，`batch-add` **保留** 原 `target.entry`，避免随 profile/模板默认值静默漂移。
 
 ---
 
@@ -37,7 +55,7 @@
 ```json
 {
   "kind": "vue",
-  "entry": "./src/pages/main/components/FigmaNode9277x28654/index.vue",
+  "entry": "./src/components/figma-batch/FigmaNode9277x28654/index.vue",
   "assets": []
 }
 ```
@@ -53,33 +71,48 @@
 
 - TargetSpec 不负责“挂载到哪里”，只负责“目标产物入口是什么”。
 
-### 1.3 MountSpec（挂载策略）
+### 1.2.1 ToolchainMeta（工具链元数据，可选）
 
-描述“如何把 TargetSpec.entry 挂载/注入到页面上，便于运行时验证”。
+由 `batch-add` 写入，用于追溯 profile / 模板来源（不参与挂载与审计门禁逻辑）。
 
 ```json
 {
-  "mountPage": "./src/pages/main/index.vue",
+  "profile": "vue3-vite-auto-routes-tailwind"
+}
+```
+
+- **profile**：生效的栈画像名（未知 profile 时写入 fallback 后的名称，与 `naming.profile` 一致）。
+
+### 1.2.2 NamingMeta.profile（可选）
+
+`naming.profile` 与 `toolchain.profile` 同步，便于在关系报告里与组件命名一并查看；**以 `toolchain.profile` 为机器读主字段**。
+
+### 1.3 MountSpec（挂载元数据，可选）
+
+描述联调时“若要把 `target.entry` 展示到某预览页”的**意图**；**不**等同于工具链自动修改业务仓库页面。
+
+> `mount` 是**可选**字段。默认 `mountMode=manual` 时 `batch-add` **不**写入 `mount`，也**不**改任何页面文件。
+
+```json
+{
+  "mountPage": "./src/pages/figma-preview.vue",
   "mode": "inject",
   "marker": "case-0"
 }
 ```
 
-- **mountPage**：挂载页面路径（相对项目根目录）。
+- **mountPage**：建议的预览/联调页路径（相对项目根目录）。
   - 支持：`.vue` / `.tsx` / `.jsx` / `.html`
-- **mode（可选）**：
-  - `inject`（默认）：工具链自动注入（Vue/React/HTML 均可）
-  - `iframe`：预留（目前不实现，后续可用于隔离渲染环境）
-  - `manual`：预留（用于显式声明“不自动改文件”）
-- **marker（可选）**：用于 HTML 注入或多 case 区分挂载位。
-  - 默认：`case-<index>`（例如 `case-0`）
+- **mode（可选，schema 保留）**：
+  - `inject`：表示“在 mountPage 中 import 并渲染 `target.entry`”（由 Agent 或 `mountMode=auto` 流程执行，**非**默认批量改页）
+  - `iframe`：预留
+  - `manual`：显式声明不自动改文件（与全局 `mountMode=manual` 一致）
+- **marker（可选）**：HTML 片段联调时区分挂载位（`data-figma-mount`）
 
-HTML 注入约定：
+边界：
 
-- 优先定位容器：`<div data-figma-mount="<marker>"></div>`
-- 若不存在，会在 `<body>` 末尾自动创建该容器（幂等）。
-- 注入内容来自 `target.entry` 文件的文本内容。
-- 重复执行必须 **替换** 同一 marker 的内容，而不是追加（幂等）。
+- **验收主路径**以 `target.entry` + `fc:ui:accept` 为准，不依赖页面 inject。
+- 历史 `ui-mount-batch` 已移除；请勿在文档或提示词中假设“运行某命令即可 `--all` 注入全 batch”。
 
 ### 1.4 AuditSpec（审计策略）
 
@@ -112,8 +145,9 @@ HTML 注入约定：
     {
       "id": "case-main-9277-28654",
       "designRef": { "fileKey": "53hw0wDvgOzH14DXSsnEmE", "nodeId": "9277-28654" },
-      "target": { "kind": "vue", "entry": "./src/pages/main/components/FigmaNode9277x28654/index.vue" },
-      "mount": { "mountPage": "./src/pages/main/index.vue", "mode": "inject" },
+      "target": { "kind": "vue", "entry": "./src/components/figma-batch/FigmaNode9277x28654/index.vue" },
+      "toolchain": { "profile": "vue3-vite-auto-routes-tailwind" },
+      "mount": { "mountPage": "./src/pages/figma-preview.vue", "mode": "inject" },
       "audit": { "mode": "web-strict" },
       "limits": { "minScore": 85, "maxWarnings": 10, "maxDiffs": 10 },
       "policy": { "allowPrimitives": [] }
@@ -150,8 +184,8 @@ HTML 注入约定：
 {
   "id": "case-vue-9277-28654",
   "designRef": { "fileKey": "53hw0wDvgOzH14DXSsnEmE", "nodeId": "9277-28654" },
-  "target": { "kind": "vue", "entry": "./src/pages/main/components/FigmaNode9277x28654/index.vue" },
-  "mount": { "mountPage": "./src/pages/main/index.vue", "mode": "inject" },
+  "target": { "kind": "vue", "entry": "./src/components/figma-batch/FigmaNode9277x28654/index.vue" },
+  "mount": { "mountPage": "./src/pages/figma-preview.vue", "mode": "inject" },
   "audit": { "mode": "web-strict" },
   "limits": { "minScore": 85, "maxWarnings": 10, "maxDiffs": 10 }
 }
@@ -163,8 +197,8 @@ HTML 注入约定：
 {
   "id": "case-react-9277-28654",
   "designRef": { "fileKey": "53hw0wDvgOzH14DXSsnEmE", "nodeId": "9277-28654" },
-  "target": { "kind": "react", "entry": "./src/pages/main/components/FigmaNode9277x28654/index.tsx" },
-  "mount": { "mountPage": "./src/pages/main/App.tsx", "mode": "inject" },
+  "target": { "kind": "react", "entry": "./src/components/figma-batch/FigmaNode9277x28654/index.tsx" },
+  "mount": { "mountPage": "./src/pages/figma-preview.tsx", "mode": "inject" },
   "audit": { "mode": "web-strict" },
   "limits": { "minScore": 85, "maxWarnings": 10, "maxDiffs": 10 }
 }
@@ -186,5 +220,5 @@ HTML 注入约定：
 建议：
 
 - HTML `entry` 建议是“片段文件”，不要包含 `<html>`/`<body>` 外壳。
-- `mount.mountPage` 用一个固定的预览页即可；`ui-mount-batch --all` 会为每个 case 保证独立 marker 幂等挂载。
+- 需要页面可见时：配置 `mountMode=auto` + `mountPage`，或由 Agent 在约定预览页手动 import `target.entry`（每个 case 使用独立 `marker` 避免冲突）。
 

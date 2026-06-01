@@ -1,15 +1,16 @@
 ---
-description: UI Batch 目标路径/命名/自动挂载约束（面向 demo/联调）
+description: UI Batch 目标路径/命名与 Agent 驱动验收（默认不改业务页）
 alwaysApply: true
 ---
 
-# UI Batch（v2）：目标入口、命名与自动挂载（强约束）
+# UI Batch（v2）：目标入口、命名与 Agent 驱动落地（强约束）
 
-本规则用于把“批量节点 -> 生成组件 -> 在目标项目真实运行/验收”的流程工程化，避免靠临时长提示词维持一致性。
+本规则用于把“批量节点 -> 登记 batch -> Agent 按 target.entry 实现 -> 验收”的流程工程化，避免靠临时长提示词维持一致性。
 
 ## 1) 目标入口（target.entry）是唯一真源
 - UI E2E / fresh workflow 都以 `figma-e2e-batch.json`（v2）的 `target.entry` 为准。
 - 生成/修复目标产物时，必须写到 `target.entry` 指定的文件路径（相对项目根目录）。
+- 默认 `targetRoot`：`./src/components/figma-batch`（**不要**写入 `src/pages/**`，避免 auto-routes 冲突）。
 
 ## 2) 命名必须严格 PascalCase
 - 组件目录名必须严格 PascalCase：`^[A-Z][A-Za-z0-9]*$`
@@ -20,26 +21,24 @@ alwaysApply: true
 ## 3) 使用工具链维护 batch（而非手写 target）
 优先使用工具链脚本更新 batch，以确保命名/target 模板一致：
 - `node node_modules/figma-to-code-pipeline/scripts/batch-add.cjs "<figma-url|cacheKey|node-id>" --fileKey=<fileKey> --kind=vue`
+- 或：`npm run fc:batch:add -- "<url|node-id>" ...`
 - 可选：
   - `--component=<StrictPascalCase>`
-  - `--target-root=...`
-  - 项目根放置 `figma-ui-batch.config.json` 统一配置 `targetRoot/targetTemplate`
+  - `--target` / `--target-root=...`（**仅**在需要迁移路径时显式传入；更新已有 case 且未传则**保留**原 `target.entry`）
+  - `--profile=vue3-vite-auto-routes-tailwind`（或 `FIGMA_UI_BATCH_PROFILE`）
+  - `--mount=auto|manual|off`（**默认 manual**：只写 batch/组件元数据，**不改**业务页面）
+  - 项目根放置 `figma-ui-batch.config.json`（模板见 `cursor-bootstrap/examples/figma-ui-batch.config.vue3-vite-auto-routes.template.json`）
 
-## 4) 挂载到页面（用于真实运行验证）
-为保证“生成即能看见”，每次生成/修复 batch 目标组件后，必须把它挂载到页面用于运行验证：
-
-- 挂载点优先级：
-  - 若项目根存在 `figma-ui-batch.config.json` 且配置了 `uiBatch.mountPage`：使用该路径
-  - 否则默认挂载点：`src/pages/main/index.vue`
-- 挂载方式：
-  - 在 `<script setup>` 里 import `target` 对应的组件
-  - 在 `<template>` 里渲染该组件一次
+## 4) mount 元数据（默认 manual，不改页面）
+- **默认 `mountMode=manual`**：`batch-add` 不写入 `mount`，**不**自动修改任何 `.vue`/`.tsx`/`.html` 业务页；验收以 `target.entry` + `fc:ui:accept` 为准。
+- **`mount` 字段**（可选）：仅描述联调意图（`mountPage` / `mode` / `marker`），供 Agent 或 `mountMode=auto` 时参考。
+- 需要“生成后即在预览页可见”时，在 config 或 CLI 设 **`mountMode=auto`**，并配置或探测 `mountPage`；由 Agent 在预览页 import `target.entry`（**无** `ui-mount-batch --all` 批量改页命令）。
+- 运行前可用 **`npm run fc:doctor`**（`--strict` 适合 CI）检查 targetRoot / mountPage 风险。
 
 约束：
-- 挂载只用于 demo/联调，不要引入额外依赖。
-- 若项目已有约定的演示页/路由入口，可按项目约定替换挂载点，但必须确保可运行可见。
+- 挂载/预览仅用于 demo/联调，不要引入额外运行时依赖。
+- 若项目已有约定的演示页/路由入口，可按项目约定手动接线，但必须确保可运行可见。
 
-## 5) 生成后必须验收（不要只看页面）
-- 必须在目标项目运行 UI batch 验收链路（例如 `npm run fc:ui:accept:batch`）。
+## 5) Agent 驱动验收（不要只看页面）
+- 典型链路：`fc:mcp:ingest(:quiet)` → `fc:batch:add` → 实现 `target.entry` → `fc:ui:preflight` → `fc:ui:accept` / `fc:ui:accept:batch`。
 - 如项目要求，也应运行 `npm run build` 以捕获 SFC 语法/依赖问题。
-

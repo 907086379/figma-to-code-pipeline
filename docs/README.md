@@ -123,3 +123,37 @@ npm run fc:mobile:spec -- --url "<figma-url>" --platform all
 - **`figma-cache/docs/colleague-guide-zh.md`**：团队向摘要（术语、首次接入）。
 - **`figma-cache/docs/quick-start-zh.md`**：兼容旧书签，正文已并入 **`figma-cache/docs/README.md`**「一页速查」。
 - **`AGENT-SETUP-PROMPT.md`**：接入任务书（`cursor init` 会刷新到业务项目根）。
+
+---
+
+## 6. auto-routes 项目兼容（新增）
+
+面向 Vue3 + Vite + `vue-router/auto-routes` 项目，推荐使用：
+
+- `uiBatch.profile = "vue3-vite-auto-routes-tailwind"`
+- `targetRoot = "./src/components/figma-batch"`（避免默认写入 `src/pages/**`）
+- `mountMode = "manual"`（默认：只登记 batch / 写 `target.entry` 组件，**不**自动改业务页面）
+- 端到端由 Agent 执行：`fc:mcp:ingest` → `fc:batch:add` → 实现 `target.entry` → `fc:ui:preflight` / `fc:ui:accept`
+- 需要页面联调时再设 `mountMode = "auto"` 并配置 `mountPage`（或由 Agent 在预览页手动 import）
+- 更新已有 batch case 时，未显式 `--target` / `--target-root` 则 `batch-add` 保留原 `target.entry`
+
+可直接运行诊断命令：
+
+```bash
+npm run fc:doctor
+```
+
+严格模式（仅 **blocking findings** 时退出码 2：`target-root-in-pages` / `auto-routes-risk` / `mount-page-not-found`；缺配置文件为 advisory，不拦 CI）：
+
+```bash
+npm run fc:doctor -- --strict
+```
+
+`fc:doctor` 会输出：
+
+- 路由模式识别（auto-routes / 普通路由）
+- `targetRoot` 风险提示（是否落在 `src/pages/**`）
+- `mountMode` / `mountPage` 可用性
+- 建议修复项（机器可读 + 人类可读）
+
+模板：`cursor-bootstrap/examples/figma-ui-batch.config.vue3-vite-auto-routes.template.json`

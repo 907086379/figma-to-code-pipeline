@@ -1,0 +1,22 @@
+﻿---
+description: 栈占位模板（仅生成期使用）：生成完成后删除本文件与 AGENT-SETUP-PROMPT.md
+alwaysApply: false
+---
+
+# Figma -> UI Stack Adapter（占位模板）
+
+本文件仅用于生成阶段引导，非长期规则。
+
+## 生成流程（强制）
+1. 基于项目栈生成 `.cursor/rules/02-figma-<stack>-adapter.mdc`。
+2. 验证新 adapter 可用（语法 + 最小执行验证）。
+3. 删除临时模板文件：
+   - `.cursor/rules/02-figma-stack-adapter.mdc`
+   - `AGENT-SETUP-PROMPT.md`
+
+## 边界
+- `01-figma-cache-core` 仅负责缓存与校验。
+- 业务 UI 实现约束由新生成的 `02-figma-<stack>-adapter.mdc` + `03/04` 规则承接。
+
+## 说明
+- 若用户明确要求保留任务书或占位模板，可不删除，并在汇报中说明原因。

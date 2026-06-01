@@ -10,6 +10,11 @@ const BOOTSTRAP = path.join(PACKAGE_ROOT, "cursor-bootstrap");
 const MANAGED_FILES_PATH = path.join(BOOTSTRAP, "managed-files.json");
 /** 消费方业务仓根（须在项目根执行本脚本） */
 const PROJECT_ROOT = process.cwd();
+const {
+  isSetupComplete,
+  effectiveRetiredFiles,
+  shouldSkipStackAdapterMirror,
+} = require("./cursor-shadow-setup.cjs");
 
 function normalize(relPath) {
   return relPath.replace(/\\/g, "/");
@@ -46,19 +51,6 @@ function loadManifest() {
   return { pairs, retired };
 }
 
-function readSetupManifest() {
-  const cacheDir = process.env.FIGMA_CACHE_DIR || "figma-cache";
-  const abs = path.join(PROJECT_ROOT, cacheDir, "project-setup.manifest.json");
-  if (!fs.existsSync(abs)) {
-    return null;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(abs, "utf8"));
-  } catch {
-    return null;
-  }
-}
-
 function copyPair(relFrom, relTo) {
   const src = path.join(BOOTSTRAP, relFrom);
   const dst = path.join(PROJECT_ROOT, relTo);
@@ -87,23 +79,14 @@ function main() {
     throw new Error(`Missing cursor-bootstrap directory: ${BOOTSTRAP}`);
   }
 
-  const setupManifest = readSetupManifest();
-  const setupComplete = setupManifest && setupManifest.status === "complete";
+  const setupComplete = isSetupComplete(PROJECT_ROOT);
 
   const { pairs, retired } = loadManifest();
-  const skipStackPlaceholder =
-    setupComplete && retired.indexOf(".cursor/rules/02-figma-stack-adapter.mdc") < 0;
-
-  const effectiveRetired = skipStackPlaceholder
-    ? [...retired, ".cursor/rules/02-figma-stack-adapter.mdc"]
-    : retired;
+  const effectiveRetired = effectiveRetiredFiles(retired, setupComplete);
 
   const copied = [];
   for (const [from, to] of pairs) {
-    if (
-      setupComplete &&
-      to === ".cursor/rules/02-figma-stack-adapter.mdc"
-    ) {
+    if (shouldSkipStackAdapterMirror(to, setupComplete)) {
       continue;
     }
     copied.push(copyPair(from, to));

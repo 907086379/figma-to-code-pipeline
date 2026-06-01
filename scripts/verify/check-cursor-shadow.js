@@ -7,6 +7,11 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..", "..");
 const BOOTSTRAP = path.join(ROOT, "cursor-bootstrap");
 const MANAGED_FILES_PATH = path.join(BOOTSTRAP, "managed-files.json");
+const {
+  isSetupComplete,
+  effectiveRetiredFiles,
+  shouldSkipStackAdapterMirror,
+} = require("./cursor-shadow-setup.cjs");
 
 function readUtf8(absPath) {
   return fs.readFileSync(absPath, "utf8");
@@ -51,8 +56,13 @@ function main() {
   const errors = [];
   const checked = [];
   const { pairs, retired } = loadManifest();
+  const setupComplete = isSetupComplete(ROOT);
+  const retiredEnforced = effectiveRetiredFiles(retired, setupComplete);
 
   for (const [from, to] of pairs) {
+    if (shouldSkipStackAdapterMirror(to, setupComplete)) {
+      continue;
+    }
     const src = path.join(BOOTSTRAP, from);
     const dst = path.join(ROOT, to);
     const fromNorm = normalize(`cursor-bootstrap/${from}`);
@@ -77,7 +87,7 @@ function main() {
     checked.push({ from: fromNorm, to: toNorm });
   }
 
-  const retiredExisting = retired
+  const retiredExisting = retiredEnforced
     .filter((relPath) => fs.existsSync(path.join(ROOT, relPath)))
     .map((relPath) => normalize(relPath));
   if (retiredExisting.length) {

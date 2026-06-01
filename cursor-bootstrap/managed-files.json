@@ -58,6 +58,7 @@
     }
   ],
   "retiredFiles": [
+    ".cursor/rules/02-figma-stack-adapter.mdc",
     ".cursor/skills/ui-baseline-governance/SKILL.md",
     ".cursor/rules/04-command-execution-anti-regression.mdc",
     ".cursor/rules/commit-conventions.mdc",

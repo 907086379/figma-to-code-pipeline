@@ -351,7 +351,8 @@ function run() {
     console.log(
       `  ${ex} upsert <figmaUrl> [--source=manual] [--completeness=a,b] [--allow-skeleton-with-figma-mcp]  (default completeness=${defaultCompletenessText})`,
     );
-    console.log(`  ${ex} validate`);
+    console.log(`  ${ex} validate [--strict-project] [--hygiene] [--strict]`);
+    console.log(`  ${ex} project-setup <init|status|finish> [--json]`);
     console.log(`  ${ex} stale [--days=14]`);
     console.log(`  ${ex} backfill`);
     console.log(

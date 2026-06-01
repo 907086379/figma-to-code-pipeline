@@ -12,6 +12,7 @@ const handleBudget = require("./budget");
 const handleConfig = require("./config");
 const handleInit = require("./init");
 const handleFlow = require("./flow");
+const handleProjectSetup = require("./project-setup");
 
 const COMMAND_HANDLERS = Object.freeze({
   cursor: handleCursor,
@@ -28,6 +29,7 @@ const COMMAND_HANDLERS = Object.freeze({
   config: handleConfig,
   init: handleInit,
   flow: handleFlow,
+  "project-setup": handleProjectSetup,
 });
 
 function createCommandRegistry(context) {

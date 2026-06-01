@@ -37,8 +37,14 @@
 6. **删除占位规则**
    确认第 5 步文件已写入且无语法问题后，**删除** `.cursor/rules/02-figma-stack-adapter.mdc`。若用户在 Cursor 设置里固定引用了该文件名，请在汇报中提示用户改为引用新的 `02-figma-<栈>-adapter.mdc`。
 
+6b. **登记项目适配完成（硬门禁，必须）**
+   - 若 `package.json` 含 `"type":"module"`，项目配置须为 **`figma-cache.config.cjs`**（勿仅用 `.js` + `require`）。
+   - 执行：`npx figma-cache project-setup finish`（或 `npm run fc:project-setup:finish`）。
+   - 写入 `figma-cache/project-setup.manifest.json`（`status: complete`）。后续批量 ingest 可要求该文件为 complete。
+   - **禁止**在 `figma-cache/reports/runtime/` 创建 `.cjs` 胶水脚本；MCP 落盘只用 `fc:mcp:ingest:url` / `mcp-raw-ingest --stdin` / `--materialize-staging`。
+
 7. **补全 npm scripts（若缺失）**
-   若 `package.json` 中没有任何 `fc:*` 脚本，请追加一组，命令使用 **`npx figma-cache`** 或 **`figma-cache`**（与项目是否已安装本包、以及 `node_modules/.bin` 是否可用一致即可，优先 `npx figma-cache` 以减少环境差异）。至少包含：`init`、`config`、`validate`、`ensure`、`get`（名称与 `figma-cache --help` 或包内 **`figma-cache/docs/README.md`** 中 scripts 示例一致即可）。
+   若 `package.json` 中没有任何 `fc:*` 脚本，请追加一组，命令使用 **`npx figma-cache`** 或 **`figma-cache`**（与项目是否已安装本包、以及 `node_modules/.bin` 是否可用一致即可，优先 `npx figma-cache` 以减少环境差异）。至少包含：`init`、`config`、`validate`、`ensure`、`get`、`project-setup finish`；ingest 推荐 **`fc:mcp:ingest:url`**（Windows 勿用 `pnpm run fc:mcp:ingest:quiet -- --url`）。
 
 8. **收尾**
    - 用简短列表向用户汇报：新建/修改/删除了哪些路径。

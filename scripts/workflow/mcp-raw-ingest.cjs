@@ -47,6 +47,7 @@ const { spawnSync } = require("child_process");
 const { URL } = require("url");
 const { parseCli } = require("../cli-args.cjs");
 const { coalesceFigmaMcpIngestArgvSlice } = require("./mcp-ingest-argv.cjs");
+const { assertProjectSetupPreflight } = require("./project-setup-preflight.cjs");
 const { sanitizeDesignContextTextForCache } = require("../sanitize-design-context-for-cache.cjs");
 const { writeMcpIngestFailureArtifact } = require("./mcp-ingest-failure-artifact.cjs");
 
@@ -333,6 +334,7 @@ function parseArgs(argv) {
       "help",
       "no-cleanup-staging",
       "materialize-staging",
+      "require-project-setup",
     ],
   });
   if (flags.help || unknown.includes("--help")) {
@@ -442,6 +444,7 @@ Options:
   --no-cleanup-staging     保留输入 staging 临时目录（默认成功后删除）
   --materialize-staging    与 --stdin 合用：在 cwd 下生成 staging-ingest-<node>/ 与标记，完成后删除
   --quiet                  成功时仅打印一行摘要；抑制 ensure/validate/budget/enrich 的 JSON 标准输出
+  --require-project-setup  要求 figma-cache/project-setup.manifest.json 为 complete（或设 FIGMA_CACHE_REQUIRE_PROJECT_SETUP=1）
   --help                   显示本说明
 `);
 }
@@ -530,6 +533,23 @@ function main() {
       stage: "args",
       message: `Unknown arguments: ${unknown.join(", ")}`,
     });
+  }
+
+  if (flags["require-project-setup"] || process.env.FIGMA_CACHE_REQUIRE_PROJECT_SETUP === "1") {
+    const cacheDirRel = (values["cache-dir"] || process.env.FIGMA_CACHE_DIR || "figma-cache").trim();
+    const pre = assertProjectSetupPreflight({
+      root: ROOT,
+      cacheDirRel,
+      requireComplete: true,
+    });
+    if (!pre.ok) {
+      failPreflight({
+        values,
+        target: null,
+        stage: "project-setup",
+        message: pre.errors.join("; "),
+      });
+    }
   }
 
   let stdinPayload = null;

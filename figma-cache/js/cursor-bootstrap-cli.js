@@ -1,5 +1,11 @@
 /* eslint-disable no-console */
 
+const {
+  readManifest,
+  ensurePendingProjectSetupManifest,
+  projectUsesEsmModules,
+} = require("./project-setup");
+
 function readUtf8IfExists(fs, absPath) {
   if (!fs.existsSync(absPath)) {
     return "";
@@ -122,8 +128,15 @@ function copyCursorBootstrap(options, deps) {
     })
     .filter(Boolean);
 
-  const configTemplatePath = path.join(CURSOR_BOOTSTRAP_DIR, "figma-cache.config.example.js");
-  const projectConfigPath = path.join(ROOT, "figma-cache.config.js");
+  const useEsm = projectUsesEsmModules(fs, path, ROOT);
+  const configTemplateJs = path.join(CURSOR_BOOTSTRAP_DIR, "figma-cache.config.example.js");
+  const configTemplateCjs = path.join(CURSOR_BOOTSTRAP_DIR, "figma-cache.config.example.cjs");
+  const configTemplatePath = fs.existsSync(configTemplateCjs) && useEsm
+    ? configTemplateCjs
+    : configTemplateJs;
+  const projectConfigFile = useEsm ? "figma-cache.config.cjs" : "figma-cache.config.js";
+  const projectConfigPath = path.join(ROOT, projectConfigFile);
+  const legacyJsConfig = path.join(ROOT, "figma-cache.config.js");
   const legacyExamplePath = path.join(ROOT, "figma-cache.config.example.js");
 
   if (!fs.existsSync(configTemplatePath)) {
@@ -132,6 +145,7 @@ function copyCursorBootstrap(options, deps) {
   }
 
   const hadProjectConfig = fs.existsSync(projectConfigPath);
+  const hadLegacyJs = fs.existsSync(legacyJsConfig) && projectConfigFile !== "figma-cache.config.js";
   const hadLegacyExample = fs.existsSync(legacyExamplePath);
   const configTemplateBody = fs.readFileSync(configTemplatePath, "utf8");
 
@@ -140,6 +154,10 @@ function copyCursorBootstrap(options, deps) {
   if (hadProjectConfig && !overwrite) {
     configAction = "skipped";
     configSource = "existing";
+  } else if (!hadProjectConfig && hadLegacyJs && !overwrite) {
+    fs.copyFileSync(legacyJsConfig, projectConfigPath);
+    configAction = "created";
+    configSource = "legacy-js-config";
   } else if (!hadProjectConfig && hadLegacyExample && !overwrite) {
     fs.copyFileSync(legacyExamplePath, projectConfigPath);
     configAction = "created";
@@ -164,6 +182,17 @@ function copyCursorBootstrap(options, deps) {
     }
   }
 
+  const existingManifest = readManifest(fs, CACHE_DIR);
+  const setupComplete = existingManifest && existingManifest.status === "complete";
+  let projectSetupManifest = existingManifest;
+  if (!setupComplete) {
+    projectSetupManifest = ensurePendingProjectSetupManifest({
+      fs,
+      cacheDir: CACHE_DIR,
+    });
+  }
+
+  let agentPromptAction = "refreshed";
   const agentSrc = path.join(CURSOR_BOOTSTRAP_DIR, "AGENT-SETUP-PROMPT.md");
   const agentDest = path.join(ROOT, "AGENT-SETUP-PROMPT.md");
   if (!fs.existsSync(agentSrc)) {
@@ -171,10 +200,14 @@ function copyCursorBootstrap(options, deps) {
     process.exit(1);
   }
 
-  let agentBody = fs.readFileSync(agentSrc, "utf8");
-  const npmPkg = readSelfNpmPackageName();
-  agentBody = agentBody.replace(/\{\{NPM_PACKAGE_NAME\}\}/g, npmPkg);
-  fs.writeFileSync(agentDest, agentBody, "utf8");
+  if (setupComplete && !overwrite) {
+    agentPromptAction = "skipped-complete";
+  } else {
+    let agentBody = fs.readFileSync(agentSrc, "utf8");
+    const npmPkg = readSelfNpmPackageName();
+    agentBody = agentBody.replace(/\{\{NPM_PACKAGE_NAME\}\}/g, npmPkg);
+    fs.writeFileSync(agentDest, agentBody, "utf8");
+  }
 
   const colleagueSrc = path.join(packageDir, "docs", "colleague-guide-zh.md");
   const colleagueDest = path.join(CACHE_DIR, "docs", "colleague-guide-zh.md");
@@ -209,14 +242,25 @@ function copyCursorBootstrap(options, deps) {
         legacyExampleFile: normalizeSlash(legacyExamplePath),
         legacyExampleStatus,
         agentPromptFile: normalizeSlash(agentDest),
+        agentPromptAction,
+        projectSetupManifest: projectSetupManifest
+          ? {
+              status: projectSetupManifest.status,
+              path: normalizeSlash(path.join(CACHE_DIR, "project-setup.manifest.json")),
+            }
+          : null,
         colleagueGuideFile: normalizeSlash(colleagueDest),
         colleagueGuideSynced: !colleagueSameFile,
         colleagueGuideNote: colleagueSameFile
           ? "colleague-guide-zh.md already at package path (toolchain dev tree); no copy."
           : "colleague-guide-zh.md refreshed under FIGMA_CACHE_DIR/docs (default figma-cache/docs/).",
         agentPromptNote:
-          "AGENT-SETUP-PROMPT.md is refreshed every run. Next: @ it in Cursor; after Agent finishes, run npm run fc:init (or npx figma-cache init if scripts are missing).",
-        npmPackageName: npmPkg,
+          agentPromptAction === "skipped-complete"
+            ? "project-setup complete: AGENT-SETUP-PROMPT.md not refreshed (use --overwrite to force)."
+            : "AGENT-SETUP-PROMPT.md refreshed. Next: @ it in Cursor; then npx figma-cache project-setup finish.",
+        npmPackageName: readSelfNpmPackageName(),
+        projectConfigFile: normalizeSlash(projectConfigPath),
+        projectUsesEsm: useEsm,
       },
       null,
       2
@@ -227,10 +271,9 @@ function copyCursorBootstrap(options, deps) {
       "================================================================\n" +
       "下一步（请按顺序）：\n" +
       "1) 在 Cursor 对话中输入 @AGENT-SETUP-PROMPT.md，并说明「按该文档执行」\n" +
-      "   （每次 cursor init 都会刷新该文件；无需再整篇粘贴。）\n" +
-      "2) 待 Agent 完成后，在项目根初始化本地缓存索引：\n" +
-      "   npm run fc:init\n" +
-      "   若尚未补全 npm scripts，请改用：npx figma-cache init\n" +
+      "   （若 project-setup 已为 complete，cursor init 默认不再刷新该文件。）\n" +
+      "2) Agent 完成后执行：npx figma-cache project-setup finish\n" +
+      "3) 初始化本地缓存索引：npm run fc:init（或 npx figma-cache init）\n" +
       "================================================================\n"
   );
 }

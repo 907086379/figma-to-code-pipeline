@@ -4,9 +4,12 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.join(__dirname, "..", "..");
-const BOOTSTRAP = path.join(ROOT, "cursor-bootstrap");
+/** npm 包根（本脚本所在包） */
+const PACKAGE_ROOT = path.join(__dirname, "..", "..");
+const BOOTSTRAP = path.join(PACKAGE_ROOT, "cursor-bootstrap");
 const MANAGED_FILES_PATH = path.join(BOOTSTRAP, "managed-files.json");
+/** 消费方业务仓根（须在项目根执行本脚本） */
+const PROJECT_ROOT = process.cwd();
 
 function normalize(relPath) {
   return relPath.replace(/\\/g, "/");
@@ -43,9 +46,22 @@ function loadManifest() {
   return { pairs, retired };
 }
 
+function readSetupManifest() {
+  const cacheDir = process.env.FIGMA_CACHE_DIR || "figma-cache";
+  const abs = path.join(PROJECT_ROOT, cacheDir, "project-setup.manifest.json");
+  if (!fs.existsSync(abs)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(abs, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function copyPair(relFrom, relTo) {
   const src = path.join(BOOTSTRAP, relFrom);
-  const dst = path.join(ROOT, relTo);
+  const dst = path.join(PROJECT_ROOT, relTo);
   if (!fs.existsSync(src)) {
     throw new Error(`Missing source template: ${src}`);
   }
@@ -58,7 +74,7 @@ function copyPair(relFrom, relTo) {
 }
 
 function deleteRetired(relPath) {
-  const abs = path.join(ROOT, relPath);
+  const abs = path.join(PROJECT_ROOT, relPath);
   if (!fs.existsSync(abs)) {
     return null;
   }
@@ -71,21 +87,46 @@ function main() {
     throw new Error(`Missing cursor-bootstrap directory: ${BOOTSTRAP}`);
   }
 
+  const setupManifest = readSetupManifest();
+  const setupComplete = setupManifest && setupManifest.status === "complete";
+
   const { pairs, retired } = loadManifest();
-  const copied = pairs.map(([from, to]) => copyPair(from, to));
-  const retiredDeleted = retired.map((relPath) => deleteRetired(relPath)).filter(Boolean);
+  const skipStackPlaceholder =
+    setupComplete && retired.indexOf(".cursor/rules/02-figma-stack-adapter.mdc") < 0;
+
+  const effectiveRetired = skipStackPlaceholder
+    ? [...retired, ".cursor/rules/02-figma-stack-adapter.mdc"]
+    : retired;
+
+  const copied = [];
+  for (const [from, to] of pairs) {
+    if (
+      setupComplete &&
+      to === ".cursor/rules/02-figma-stack-adapter.mdc"
+    ) {
+      continue;
+    }
+    copied.push(copyPair(from, to));
+  }
+
+  const retiredDeleted = effectiveRetired
+    .map((relPath) => deleteRetired(relPath))
+    .filter(Boolean);
 
   process.stdout.write(
     `${JSON.stringify(
       {
         ok: true,
+        projectRoot: normalize(PROJECT_ROOT),
+        packageRoot: normalize(PACKAGE_ROOT),
+        setupComplete: Boolean(setupComplete),
         sourceOfTruth: "cursor-bootstrap/managed-files.json",
         copied,
         retiredDeleted,
       },
       null,
-      2
-    )}\n`
+      2,
+    )}\n`,
   );
 }
 

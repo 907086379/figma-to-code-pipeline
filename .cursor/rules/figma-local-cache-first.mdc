@@ -8,6 +8,6 @@ alwaysApply: false
 本仓库的 Figma 缓存与 Agent 约定已拆分为：
 
 1. **`.cursor/rules/01-figma-cache-core.mdc`** — 链接标准化、本地索引、MCP、**`fc:mcp:ingest` 默认落盘**、validate；**不写业务前端**。
-2. **`.cursor/rules/02-figma-stack-adapter.mdc`**（占位）— 提示用 Agent 生成 **`02-figma-<你的栈>-adapter.mdc`**；具体 Vue / React / 组件库约定只在栈专属文件中描述。
+2. **`.cursor/rules/02-figma-<栈>-adapter.mdc`**（如 `02-figma-vue3-vite-tailwind-adapter.mdc`）— 栈专属 UI 约定；**勿**保留 `02-figma-stack-adapter.mdc` 占位（见 `project-setup finish`）。
 
 请以上述规则为准；本文件保留作入口说明与人工查阅。

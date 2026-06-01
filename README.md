@@ -48,7 +48,16 @@ npm run verify:docs && npm test
 
 提交前：`README.md`、`docs/*.md`、`figma-cache/docs/*.md` 保持 **UTF-8 无 BOM**；改 CLI 请同步 **`figma-cache/docs/README.md`** / **`CHANGELOG.md`**。
 
-发布 npm 前：若根目录存在本地 **`README.owner.md`**（`.gitignore` 已忽略），部分 npm 会按 `README*` 规则将其打入包；可临时**改名**（避免以 `README` 开头）或移出根目录后再执行 `npm publish`。
+### Windows 发 npm（硬链接 / 415）
+
+在 **NTFS** 上，`npm pack` 可能把磁盘**硬链接**写进 tarball，registry 会拒绝（**415 Hard link is not allowed**）。本仓库在 **`prepack`** 中于 `win32` 执行 `scripts/publish/materialize-pack-files.cjs`，对即将打包的路径（`package.json` `files` 展开 + npm 自动纳入的根 `README*` / `CHANGELOG*` / `LICENSE` 等）做实体化。
+
+- **推荐发版**：`npm run publish:win`（清 stale `.tgz` → `npm pack` → `pack:check-tarball` → `npm publish`）
+- **仅验包**：`npm pack` 后 `npm run pack:check-tarball`（需 `tar -tvf` 可用，如 Git for Windows / bsdtar）
+- **日常开发**用 `pnpm test` 即可；**发版 tarball 以 npm 为准**（`prepack` / `publish:win`），勿假定 `pnpm pack` 行为相同
+- 修改 `package.json` 的 **`files`** 时，须同步维护 `scripts/publish/expand-package-files.cjs` 中的 glob 分支
+
+其它注意：若根目录存在本地 **`README.owner.md`**（`.gitignore` 已忽略），npm 可能按 `README*` 打入包；发版前可临时**改名**（避免以 `README` 开头）或移出根目录。
 
 ---
 

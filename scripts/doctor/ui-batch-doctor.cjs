@@ -5,6 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const { parseCli } = require("../cli-args.cjs");
 const { readUiBatchConfig, buildUiBatchDoctorReport } = require("../ui/ui-batch-mount.cjs");
+const { evaluateProjectSetup } = require("../../figma-cache/js/project-setup");
+const { runAgentRuntimeHygieneGate } = require("../workflow/agent-runtime-hygiene-gate.cjs");
+const { createRequire } = require("module");
 
 const ROOT = process.cwd();
 const FAIL_EXIT_CODE = 2;
@@ -70,12 +73,68 @@ function main() {
     kind: String(values.kind || "").trim() || "vue",
   });
 
+  const cacheDir = path.join(ROOT, process.env.FIGMA_CACHE_DIR || "figma-cache");
+  const requireFromRoot = createRequire(path.join(ROOT, "package.json"));
+  function loadProjectConfig() {
+    for (const name of ["figma-cache.config.cjs", "figma-cache.config.js"]) {
+      const abs = path.join(ROOT, name);
+      if (!fs.existsSync(abs)) continue;
+      try {
+        const mod = requireFromRoot(abs);
+        return mod && mod.default ? mod.default : mod;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  function getProjectConfigPath() {
+    for (const name of ["figma-cache.config.cjs", "figma-cache.config.js"]) {
+      const abs = path.join(ROOT, name);
+      if (fs.existsSync(abs)) {
+        try {
+          requireFromRoot(abs);
+          return abs;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  const projectSetup = evaluateProjectSetup({
+    fs,
+    path,
+    root: ROOT,
+    cacheDir,
+    loadProjectConfig,
+    getProjectConfigPath,
+  });
+  const agentHygiene = runAgentRuntimeHygieneGate(ROOT);
+
+  const setupBlocking = projectSetup.ok
+    ? []
+    : projectSetup.errors.map((e) => `project-setup:${e}`);
+  const hygieneBlocking = agentHygiene.blocking.map((b) => `agent-hygiene:${b}`);
+
   const report = {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     projectRoot: ROOT,
     framework,
     routeMode,
+    projectSetup: {
+      ok: projectSetup.ok,
+      stackAdapters: projectSetup.stackAdapters,
+      errors: projectSetup.errors,
+      warnings: projectSetup.warnings,
+    },
+    agentHygiene: {
+      ok: agentHygiene.ok,
+      blocking: agentHygiene.blocking,
+      warnings: agentHygiene.warnings,
+    },
     uiBatch: {
       configPath: uiBatch.path,
       exists: uiBatch.exists,
@@ -91,10 +150,14 @@ function main() {
     },
     advisories: doctor.advisories,
     findings: doctor.findings,
-    blockingFindings: doctor.blockingFindings,
+    blockingFindings: [
+      ...doctor.blockingFindings,
+      ...setupBlocking,
+      ...hygieneBlocking,
+    ],
     recommendations: doctor.recommendations,
-    ok: doctor.ok,
-    fullyOk: doctor.fullyOk,
+    ok: doctor.ok && projectSetup.ok && agentHygiene.ok,
+    fullyOk: doctor.fullyOk && projectSetup.ok && agentHygiene.ok,
   };
 
   const outPath = String(values.out || "").trim();
@@ -126,11 +189,15 @@ function main() {
     if (doctor.recommendations.length) {
       console.log(`- recommendations: ${doctor.recommendations.join(", ")}`);
     }
-    console.log(`- ok (strict/blocking): ${doctor.ok}`);
-    console.log(`- fullyOk: ${doctor.fullyOk}`);
+    console.log(`- projectSetup: ${projectSetup.ok ? "ok" : projectSetup.errors.join("; ")}`);
+    console.log(
+      `- agentHygiene: ${agentHygiene.ok ? "ok" : agentHygiene.blocking.join("; ")}`,
+    );
+    console.log(`- ok (strict/blocking): ${report.ok}`);
+    console.log(`- fullyOk: ${report.fullyOk}`);
   }
 
-  if (flags.strict && !doctor.ok) {
+  if (flags.strict && !report.ok) {
     process.exit(FAIL_EXIT_CODE);
   }
 }

@@ -75,6 +75,13 @@
 - `batch-add`：`manual/off` 时 `upsertCaseV2` 会 `delete` 残留 `mount`；更新已有 case 且未显式 `--target`/`--target-root` 时保留 `target.entry`
 - 未知 `mountMode` 字符串归 `manual`（非 `auto`）
 
+## F. Agent 运行时门禁（4.4+）
+
+- [x] `figma-cache project-setup <init|status|finish>` + `project-setup.manifest.json`
+- [x] `validate --strict-project` / `--hygiene`；ingest `--require-project-setup`
+- [x] `fc:mcp:ingest:url`、`fc:mcp:batch:cache`、`agent-runtime-hygiene-gate`
+- [x] `docs/AGENT-RUNTIME-GUARDRAILS.md`；`cursor init` 尊重 `complete` + ESM `.cjs` 配置模板
+
 ## 7) 与下游联动说明
 
 - 上游完成后，回到业务仓执行：`migration/shared/FIGMA-DUAL-REPO-ADAPTATION-TASKLIST.md`。

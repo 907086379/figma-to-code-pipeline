@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+## 4.4.0（2026-06-01）
+
+- **Windows npm 发布（415 硬链接）**：`prepack` 在 win32 执行 `materialize-pack-files`（`getPackCandidatePaths`：`files` 展开 + `package.json` / `README*` / `CHANGELOG*` / `LICENSE` 等 npm 自动根文件）；`pack:check-tarball`（`tar -tvf` 检测 `h` 条目）；`publish:win`（清 stale `.tgz` → pack → 校验 → publish）；`expand-package-files` 与 `verify:pack` 共用路径展开；scoped 包 tarball 命名；`tests/publish-pack-files.test.js`。
+- **project-setup 硬门禁**：`figma-cache project-setup <init|status|finish>` + `figma-cache/project-setup.manifest.json`；`validate --strict-project`；ingest `--require-project-setup` / `FIGMA_CACHE_REQUIRE_PROJECT_SETUP=1`。
+- **agent-runtime-hygiene**：禁止 `figma-cache/reports/runtime/**/*.cjs` 与无标记的 `staging-*`；`validate --hygiene`、`fc:agent:hygiene`；`fc:doctor` 合并 projectSetup + hygiene。
+- **Windows ingest**：`fc:mcp:ingest:url`（剥离 pnpm 多余 `--`）；`fc:mcp:batch:cache`（`--batch-json` 批量 `--stdin` 落盘）。
+- **cursor init**：`type:module` 项目默认 `figma-cache.config.cjs`；setup `complete` 时跳过刷新 `AGENT-SETUP-PROMPT.md`。
+- **`verify:cursor:sync`**：目标目录改为 **`process.cwd()`**（消费方项目根）；`setup complete` 时跳过复制 stack 占位规则。
+- **文档**：`docs/AGENT-RUNTIME-GUARDRAILS.md`；`01-figma-cache-core` / `AGENT-SETUP-PROMPT` 禁止 reports 胶水脚本。
+
 - **UI batch 语义统一（Agent 驱动）**：`figma-cache/docs/ui-batch-v2-spec-zh.md`、`docs/README.md` 与规则模板统一为 `fc:mcp:ingest(:quiet) -> fc:batch:add -> target.entry 实现 -> fc:ui:preflight/fc:ui:accept`，默认 `mountMode=manual` 不自动改业务页面，移除 `ui-mount-batch --all` 口径。
 - **`batch-add` 防静默路径漂移**：更新已有 case 且未显式传 `--target`/`--target-root` 时保留原 `target.entry`；显式传参时才迁移。新增 `scripts/ui/ui-batch-mount.cjs` 抽取 profile/mount/doctor/target 解析逻辑，并增加 `target.entry.source` 输出。
 - **诊断与测试增强**：新增 `fc:doctor`（`scripts/doctor/ui-batch-doctor.cjs`）与 `tests/ui-batch-mount.test.js`、`tests/batch-add-target-entry.integration.test.js`；`test:node` 已串联新测试。

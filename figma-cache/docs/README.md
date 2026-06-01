@@ -14,9 +14,30 @@
 
 ### 默认执行链
 
-先查本地缓存 → 按需 MCP → **`mcp-raw/`** 落盘：**`npm run fc:mcp:ingest:quiet` 一条龙**（`ensure` → `validate` → `fc:budget --mcp-only`）。派生物刷新在同一命令加 **`--enrich`**。**不要**把「再跑一遍 `fc:mcp:gate`」当默认步骤（与 ingest 尾部重复）。
+先 **`cursor init` + AGENT-SETUP** → **`npx figma-cache project-setup finish`**（写 `project-setup.manifest.json`）→ 查本地缓存 → 按需 MCP → **`mcp-raw/`** 落盘（ingest 一条龙）。批量前：`figma-cache validate --strict-project --hygiene`。
+
+### project-setup 与 Agent 门禁（4.4+）
+
+| 命令 | 说明 |
+|------|------|
+| `figma-cache project-setup finish` | AGENT-SETUP 完成后登记 `complete` |
+| `figma-cache validate --strict-project` | 未完成 setup 则失败 |
+| `figma-cache validate --hygiene` | 禁止 `reports/runtime/*.cjs` 胶水 |
+| `fc:doctor -- --strict` | 含 ui-batch + projectSetup + hygiene |
+
+详见仓库根 **`docs/AGENT-RUNTIME-GUARDRAILS.md`**。
 
 ### MCP 回包落盘（`fc:mcp:ingest`）
+
+**Windows / pnpm（推荐）**
+
+```bash
+pnpm run fc:mcp:ingest:url -- "https://www.figma.com/design/...?node-id=12-34"
+```
+
+**勿用** `pnpm run fc:mcp:ingest:quiet -- --url "..."`（多余 `--` 会导致 preflight 失败）。**禁止**在 `figma-cache/reports/runtime/` 写 `.cjs` 胶水；只用 **`--stdin`** 或官方 **`--materialize-staging`**。
+
+### MCP 回包落盘（文件参数 / stdin）
 
 在 Cursor 等环境调用 MCP 拿到三段原始文本后，保存为文件或使用 stdin JSON，再执行：
 

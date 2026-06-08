@@ -52,6 +52,32 @@ npm run fc:mcp:ingest:quiet -- --url="<含 node-id 的 Figma 链接>" \
 
 也可用 **`--stdin`** 从管道读 JSON（键名含 `get_design_context` / `get_metadata` / `get_variable_defs`）。
 
+### 节点分组 `node-segment`（4.5+）
+
+同一 `fileKey#nodeId` 可按业务域落在 `nodes/<segment>/<nodeId>/`（如 `sip`、`input`），避免扁平 `nodes/<nodeId>/` 混放。
+
+| 入口 | 用法 |
+|------|------|
+| ingest | `--node-segment=sip` 或 `FIGMA_CACHE_NODE_SEGMENT=sip` |
+| ensure / upsert | `figma-cache ensure <url> --node-segment=sip` |
+| batch | `fc:mcp:batch:cache --node-segment=sip --batch-json=...` |
+
+未传 segment 时：若 `index.json` 已有该 cacheKey 的 `paths.meta`，沿用既有目录；否则默认 `nodes/<nodeId>/`。
+
+**batch-json 示例**（每项 `nodeSegment` 优先于全局 segment）：
+
+```json
+[
+  {
+    "url": "https://www.figma.com/design/abc123/File?node-id=12-34",
+    "nodeSegment": "sip",
+    "get_design_context": "...",
+    "get_metadata": "...",
+    "get_variable_defs": {}
+  }
+]
+```
+
 默认行为：写入约定文件名、`mcp-raw-manifest.json`（sha256 / size / toolCalls），并串联 **`fc:ensure --source=figma-mcp`** → **`fc:validate`** → **`fc:budget --mcp-only`**。成功路径推荐 **`npm run fc:mcp:ingest:quiet`**（内置 `--quiet`，末行仅摘要）。需要刷新派生物时在**同一条命令**上加 **`--enrich`**。可用 **`--skip-budget`** 跳过 budget（少见）。完整选项：`npm run fc:mcp:ingest -- --help`。
 
 ### 稿内标注 `data-annotations`（与 MCP 尾部消毒）

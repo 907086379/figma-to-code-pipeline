@@ -87,7 +87,7 @@ function createUpsertService(deps) {
     };
   }
 
-  function buildPaths(normalized) {
+  function buildPaths(normalized, extra) {
     if (normalized.scope === "file") {
       return {
         meta: `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/meta.json`,
@@ -98,11 +98,22 @@ function createUpsertService(deps) {
     }
 
     const safeNode = sanitizeNodeId(normalized.nodeId);
+    const segmentRaw = extra && extra.nodeSegment ? String(extra.nodeSegment).trim() : "";
+    const segment = segmentRaw
+      ? segmentRaw
+          .replace(/^\/+|\/+$/g, "")
+          .split("/")
+          .filter((p) => p && p !== "." && p !== "..")
+          .join("/")
+      : "";
+    const nodeBase = segment
+      ? `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${segment}/${safeNode}`
+      : `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${safeNode}`;
     return {
-      meta: `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${safeNode}/meta.json`,
-      spec: `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${safeNode}/spec.md`,
-      stateMap: `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${safeNode}/state-map.md`,
-      raw: `${CACHE_BASE_FOR_STORAGE}/files/${normalized.fileKey}/nodes/${safeNode}/raw.json`,
+      meta: `${nodeBase}/meta.json`,
+      spec: `${nodeBase}/spec.md`,
+      stateMap: `${nodeBase}/state-map.md`,
+      raw: `${nodeBase}/raw.json`,
     };
   }
 
@@ -117,7 +128,12 @@ function createUpsertService(deps) {
       url: normalized.normalizedUrl,
       originalUrls: mergedUrls,
       normalizationVersion: NORMALIZATION_VERSION,
-      paths: oldItem && oldItem.paths ? oldItem.paths : buildPaths(normalized),
+      paths:
+        extra && extra.nodeSegment && (!oldItem || extra.forceNodeSegment)
+          ? buildPaths(normalized, extra)
+          : oldItem && oldItem.paths
+            ? oldItem.paths
+            : buildPaths(normalized, extra),
       syncedAt,
       completeness: resolveCompleteness(extra, oldItem),
       source: (extra && extra.source) || (oldItem && oldItem.source) || "manual",

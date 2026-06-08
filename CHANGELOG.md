@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 4.5.0（2026-06-08）
+
+- **node-segment 节点分组**：`files/<fileKey>/nodes/<segment>/<nodeId>/` 可选子目录；`--node-segment` / `FIGMA_CACHE_NODE_SEGMENT` 贯穿 `fc:mcp:ingest`、`figma-cache ensure|upsert`、`fc:mcp:batch:cache`；新增 `scripts/workflow/resolve-node-storage.cjs`（显式 segment、index `paths.meta` 回退、默认扁平路径）。
+- **section 概览 validate 放宽**：`get_metadata` 根为 `<section` 时跳过 design context 资产检查并放宽 `data-node-id` 引用数阈值。
+- **batch-json per-item segment**：每项可设 `"nodeSegment": "sip"`，优先于全局 CLI/env segment；`mcpRawExists` / `skip-existing` 与 ingest 路径解析一致。
+
 ## 4.4.0（2026-06-01）
 
 - **Windows npm 发布（415 硬链接）**：`prepack` 在 win32 执行 `materialize-pack-files`（`getPackCandidatePaths`：`files` 展开 + `package.json` / `README*` / `CHANGELOG*` / `LICENSE` 等 npm 自动根文件）；`pack:check-tarball`（`tar -tvf` 检测 `h` 条目）；`publish:win`（清 stale `.tgz` → pack → 校验 → publish）；`expand-package-files` 与 `verify:pack` 共用路径展开；scoped 包 tarball 命名；`tests/publish-pack-files.test.js`。

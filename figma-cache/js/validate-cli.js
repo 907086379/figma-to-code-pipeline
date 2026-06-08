@@ -190,6 +190,19 @@ function resolveMcpEvidenceThresholds(cacheKey, deps) {
 
   return thresholds;
 }
+
+function isSectionOverviewMetadata(fileAbs, deps) {
+  const metaXmlPath = deps.path.join(deps.path.dirname(fileAbs), "mcp-raw-get-metadata.xml");
+  if (!deps.fs.existsSync(metaXmlPath)) {
+    return false;
+  }
+  let metaContent = String(deps.fs.readFileSync(metaXmlPath, "utf8") || "");
+  if (metaContent.charCodeAt(0) === 0xfeff) {
+    metaContent = metaContent.slice(1);
+  }
+  return metaContent.trimStart().startsWith("<section");
+}
+
 function validateDesignContextNotSkeleton(cacheKey, fileAbs, content, errors, deps, thresholds) {
   const { normalizeSlash } = deps;
   const minBytes = thresholds.minDesignContextBytes;
@@ -217,8 +230,10 @@ function validateDesignContextNotSkeleton(cacheKey, fileAbs, content, errors, de
     );
   }
 
+  const sectionOverview = isSectionOverviewMetadata(fileAbs, deps);
+
   const minNodeRefs = thresholds.minDesignContextNodeRefs;
-  if (minNodeRefs > 0) {
+  if (minNodeRefs > 0 && !sectionOverview) {
     const nodeRefs = (text.match(/data-node-id="/g) || []).length;
     if (nodeRefs < minNodeRefs) {
       errors.push(
@@ -230,15 +245,17 @@ function validateDesignContextNotSkeleton(cacheKey, fileAbs, content, errors, de
   }
 
   if (thresholds.requireDesignContextAssets) {
-    const hasAssetConstants =
-      /\bconst\s+img[A-Za-z0-9_]*\s*=\s*"https:\/\/www\.figma\.com\/api\/mcp\/asset\//.test(text);
-    const hasImgUsage = /<img\b/i.test(text);
-    if (!hasAssetConstants || !hasImgUsage) {
-      errors.push(
-        `${cacheKey}: get_design_context 缺少资产常量或 <img> 使用（疑似被省略/占位）。如节点确实无资产，可设 FIGMA_MCP_REQUIRE_DESIGN_CONTEXT_ASSETS=0 或在项目配置里覆盖该 cacheKey ${normalizeSlash(
-          fileAbs
-        )}`
-      );
+    if (!sectionOverview) {
+      const hasAssetConstants =
+        /\bconst\s+img[A-Za-z0-9_]*\s*=\s*"https:\/\/www\.figma\.com\/api\/mcp\/asset\//.test(text);
+      const hasImgUsage = /<img\b/i.test(text);
+      if (!hasAssetConstants || !hasImgUsage) {
+        errors.push(
+          `${cacheKey}: get_design_context 缺少资产常量或 <img> 使用（疑似被省略/占位）。如节点确实无资产，可设 FIGMA_MCP_REQUIRE_DESIGN_CONTEXT_ASSETS=0 或在项目配置里覆盖该 cacheKey ${normalizeSlash(
+            fileAbs
+          )}`
+        );
+      }
     }
   }
 }

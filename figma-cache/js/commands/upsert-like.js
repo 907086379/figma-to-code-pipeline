@@ -11,13 +11,13 @@ module.exports = function runUpsertLikeCommand(commandName, args, context) {
   } = context;
 
   const { values, flags, positionals } = parseTailWithCli(args, {
-    strings: ["source", "completeness"],
+    strings: ["source", "completeness", "node-segment"],
     booleanFlags: ["allow-skeleton-with-figma-mcp"],
   });
   const url = positionals[0];
   if (!url) {
     console.error(
-      `Usage: figma-cache ${commandName} <figmaUrl> [--source=manual] [--completeness=a,b] [--allow-skeleton-with-figma-mcp]`,
+      `Usage: figma-cache ${commandName} <figmaUrl> [--source=manual] [--completeness=a,b] [--node-segment=sip] [--allow-skeleton-with-figma-mcp]`,
     );
     process.exit(1);
   }
@@ -28,8 +28,11 @@ module.exports = function runUpsertLikeCommand(commandName, args, context) {
   const completeness = completenessRaw
     ? normalizeCompletenessList(completenessRaw.split(","))
     : [...defaultCompleteness];
+  const nodeSegment =
+    (values["node-segment"] || process.env.FIGMA_CACHE_NODE_SEGMENT || "").trim() || undefined;
+  const upsertExtra = { source, completeness, ...(nodeSegment ? { nodeSegment } : {}) };
 
-  const preview = previewUpsertByUrl(url, { source, completeness });
+  const preview = previewUpsertByUrl(url, upsertExtra);
   if (source === "figma-mcp") {
     const mcpErrors = validateMcpRawEvidence(
       preview.normalized.cacheKey,
@@ -47,7 +50,7 @@ module.exports = function runUpsertLikeCommand(commandName, args, context) {
     }
   }
 
-  const result = upsertByUrl(url, { source, completeness });
+  const result = upsertByUrl(url, upsertExtra);
   if (commandName === "ensure") {
     ensureEntryFilesAndHook(result.normalized.cacheKey, result.item);
     console.log(

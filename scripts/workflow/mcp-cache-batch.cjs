@@ -6,6 +6,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { parseCli } = require("../cli-args.cjs");
 const { assertProjectSetupPreflight } = require("./project-setup-preflight.cjs");
+const { resolveNodeDirAbs } = require("./resolve-node-storage.cjs");
 
 const ROOT = process.cwd();
 const INGEST = path.join(__dirname, "mcp-raw-ingest.cjs");
@@ -35,18 +36,20 @@ function readBatchJson(values) {
   return raw;
 }
 
-function mcpRawExists(cacheDirRel, fileKey, nodeIdColon) {
-  const dash = String(nodeIdColon).replace(/:/g, "-");
-  const manifest = path.join(
-    ROOT,
-    cacheDirRel,
-    "files",
+function resolveCacheDirAbs(cacheDirRel) {
+  return path.isAbsolute(cacheDirRel) ? path.normalize(cacheDirRel) : path.join(ROOT, cacheDirRel);
+}
+
+function mcpRawExists(cacheDirRel, fileKey, nodeIdColon, nodeSegment) {
+  const cacheDirAbs = resolveCacheDirAbs(cacheDirRel);
+  const nodeDirAbs = resolveNodeDirAbs({
     fileKey,
-    "nodes",
-    dash,
-    "mcp-raw",
-    "mcp-raw-manifest.json",
-  );
+    nodeId: nodeIdColon,
+    nodeSegment,
+    cacheDirAbs,
+    indexJsonPath: path.join(cacheDirAbs, "index.json"),
+  });
+  const manifest = path.join(nodeDirAbs, "mcp-raw", "mcp-raw-manifest.json");
   return fs.existsSync(manifest);
 }
 
@@ -59,10 +62,13 @@ function parseCacheKeyFromUrl(url) {
   return { fileKey, nodeIdColon: nodeColon };
 }
 
-function runIngestStdin(url, payload, quiet) {
+function runIngestStdin(url, payload, quiet, nodeSegment) {
   const args = [INGEST];
   if (quiet) args.push("--quiet");
   args.push("--stdin", `--url=${url}`);
+  if (nodeSegment) {
+    args.push(`--node-segment=${nodeSegment}`);
+  }
   const r = spawnSync(process.execPath, args, {
     cwd: ROOT,
     input: JSON.stringify(payload),
@@ -75,7 +81,7 @@ function runIngestStdin(url, payload, quiet) {
 
 function main() {
   const { values, flags, positional } = parseCli(process.argv, {
-    strings: ["urls-file", "batch-json", "cache-dir"],
+    strings: ["urls-file", "batch-json", "cache-dir", "node-segment"],
     booleanFlags: ["quiet", "skip-existing", "require-project-setup", "no-validate", "help"],
   });
 
@@ -83,10 +89,17 @@ function main() {
     console.log(`
 Usage:
   node scripts/workflow/mcp-cache-batch.cjs [--quiet] [--skip-existing] [--require-project-setup] \\
-    --urls-file=urls.txt
-  node scripts/workflow/mcp-cache-batch.cjs --batch-json=payloads.json
+    [--node-segment=sip] --urls-file=urls.txt
+  node scripts/workflow/mcp-cache-batch.cjs [--node-segment=sip] --batch-json=payloads.json
 
-batch-json array items: { "url": "...", "get_design_context": "...", "get_metadata": "...", "get_variable_defs": {} }
+Options:
+  --node-segment=<name>    节点分组目录（如 sip、input）；也可用环境变量 FIGMA_CACHE_NODE_SEGMENT
+  --cache-dir              缓存根目录（默认 ./figma-cache 或 FIGMA_CACHE_DIR）
+
+batch-json array items:
+  { "url": "...", "get_design_context": "...", "get_metadata": "...", "get_variable_defs": {},
+    "nodeSegment": "sip" }
+  每项 nodeSegment 优先于全局 --node-segment / FIGMA_CACHE_NODE_SEGMENT。
 
 Does NOT call Figma MCP — Agent must supply MCP payloads in batch-json or pre-run ingest per URL.
 `);
@@ -95,6 +108,8 @@ Does NOT call Figma MCP — Agent must supply MCP payloads in batch-json or pre-
 
   const quiet = !!flags.quiet;
   const cacheDirRel = (values["cache-dir"] || process.env.FIGMA_CACHE_DIR || "figma-cache").trim();
+  const globalNodeSegment =
+    (values["node-segment"] || process.env.FIGMA_CACHE_NODE_SEGMENT || "").trim() || undefined;
 
   if (flags["require-project-setup"] || process.env.FIGMA_CACHE_REQUIRE_PROJECT_SETUP === "1") {
     const pre = assertProjectSetupPreflight({ root: ROOT, cacheDirRel, requireComplete: true });
@@ -119,11 +134,13 @@ Does NOT call Figma MCP — Agent must supply MCP payloads in batch-json or pre-
         continue;
       }
       const { fileKey, nodeIdColon } = parseCacheKeyFromUrl(url);
+      const itemNodeSegment =
+        (item.nodeSegment || item["node-segment"] || globalNodeSegment || "").trim() || undefined;
       if (
         flags["skip-existing"] &&
         fileKey &&
         nodeIdColon &&
-        mcpRawExists(cacheDirRel, fileKey, nodeIdColon)
+        mcpRawExists(cacheDirRel, fileKey, nodeIdColon, itemNodeSegment)
       ) {
         skipCount += 1;
         if (!quiet) console.log(`skip-existing ${fileKey}#${nodeIdColon}`);
@@ -137,6 +154,7 @@ Does NOT call Figma MCP — Agent must supply MCP payloads in batch-json or pre-
           get_variable_defs: item.get_variable_defs ?? item.variableDefs,
         },
         quiet,
+        itemNodeSegment,
       );
       if (code === 0) okCount += 1;
       else failCount += 1;
@@ -153,7 +171,7 @@ Does NOT call Figma MCP — Agent must supply MCP payloads in batch-json or pre-
         flags["skip-existing"] &&
         fileKey &&
         nodeIdColon &&
-        mcpRawExists(cacheDirRel, fileKey, nodeIdColon)
+        mcpRawExists(cacheDirRel, fileKey, nodeIdColon, globalNodeSegment)
       ) {
         skipCount += 1;
         if (!quiet) console.log(`skip-existing ${fileKey}#${nodeIdColon}`);

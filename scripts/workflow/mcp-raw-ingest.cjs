@@ -50,6 +50,7 @@ const { coalesceFigmaMcpIngestArgvSlice } = require("./mcp-ingest-argv.cjs");
 const { assertProjectSetupPreflight } = require("./project-setup-preflight.cjs");
 const { sanitizeDesignContextTextForCache } = require("../sanitize-design-context-for-cache.cjs");
 const { writeMcpIngestFailureArtifact } = require("./mcp-ingest-failure-artifact.cjs");
+const { resolveNodeDirAbs } = require("./resolve-node-storage.cjs");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const BIN = path.join(ROOT, "bin", "figma-cache.js");
@@ -322,6 +323,7 @@ function parseArgs(argv) {
       "design-context-file",
       "metadata-file",
       "variable-defs-file",
+      "node-segment",
     ],
     booleanFlags: [
       "stdin",
@@ -435,6 +437,7 @@ Options:
   --url-file=<path>        从文件首行读取 URL（避免 shell 对 & 拆词）；与 --url 二选一
   （环境变量 FIGMA_MCP_INGEST_URL：未传 --url 时作为 URL，同样可绕开 cmd 对 & 的解析）
   --cache-dir              缓存根目录（默认 ./figma-cache 或环境变量 FIGMA_CACHE_DIR）
+  --node-segment=<name>    节点分组目录（如 sip、input）；也可用环境变量 FIGMA_CACHE_NODE_SEGMENT
   --mcp-server             写入 manifest.mcp-server（默认 user-Figma）
   --no-sanitize            不消毒 design context（默认执行 sanitize-design-context-for-cache）
   --no-ensure              只写 mcp-raw，不执行 fc:ensure
@@ -684,8 +687,15 @@ function main() {
     });
   }
 
-  const safeNode = sanitizeNodeId(target.nodeId);
-  const mcpRawDir = path.join(cacheDirAbs, "files", target.fileKey, "nodes", safeNode, "mcp-raw");
+  const nodeSegment = (values["node-segment"] || process.env.FIGMA_CACHE_NODE_SEGMENT || "").trim() || undefined;
+  const nodeDirAbs = resolveNodeDirAbs({
+    fileKey: target.fileKey,
+    nodeId: target.nodeId,
+    nodeSegment,
+    cacheDirAbs,
+    indexJsonPath: path.join(cacheDirAbs, "index.json"),
+  });
+  const mcpRawDir = path.join(nodeDirAbs, "mcp-raw");
 
   const filesMap = { ...DEFAULT_FILES };
   const contentsByTool = {
@@ -747,6 +757,9 @@ function main() {
 
   if (!flags["no-ensure"]) {
     const args = ["ensure", target.normalizedUrl, "--source=figma-mcp"];
+    if (nodeSegment) {
+      args.push(`--node-segment=${nodeSegment}`);
+    }
     const r = runFigCacheChild(args, env, quiet);
     if (!r.ok) {
       failIngest({

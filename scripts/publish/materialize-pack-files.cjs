@@ -3,7 +3,7 @@
 
 /**
  * Windows：npm pack 会把 NTFS 硬链接写进 tarball，registry 会 415 Hard link is not allowed。
- * 在 prepack 阶段把即将发布的文件「实体化」为独立文件（unlink + 重写内容）。
+ * 在 prepack 阶段把即将发布的文件「实体化」为独立文件（先写同目录临时文件，再 unlink + rename）。
  * 退出码：0 成功，1 失败（与 verify-tarball / remove-stale 一致）。
  */
 
@@ -45,11 +45,22 @@ function materializeFileAt(rootAbs, relPath) {
     return { materialized: false };
   }
 
+  const tmp = path.join(
+    path.dirname(abs),
+    `.${path.basename(abs)}.materialize-${process.pid}-${Date.now()}`,
+  );
+
   try {
     const buf = fs.readFileSync(abs);
+    fs.writeFileSync(tmp, buf);
     fs.unlinkSync(abs);
-    fs.writeFileSync(abs, buf);
+    fs.renameSync(tmp, abs);
   } catch (e) {
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+      /* ignore temp cleanup failure */
+    }
     return { materialized: false, error: `${relPath}: ${e.message}` };
   }
 

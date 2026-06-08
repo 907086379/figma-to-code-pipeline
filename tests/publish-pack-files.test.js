@@ -79,6 +79,9 @@ function runMaterializeFixture() {
 
     const r2 = materializeFileAt(root, "b.txt");
     assert.strictEqual(r2.materialized, false, "second path should have nlink 1 after first break");
+
+    const leftovers = fs.readdirSync(root).filter((n) => n.includes(".materialize-"));
+    assert.strictEqual(leftovers.length, 0, "no temp files after materialize");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

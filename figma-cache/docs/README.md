@@ -78,6 +78,51 @@ npm run fc:mcp:ingest:quiet -- --url="<含 node-id 的 Figma 链接>" \
 ]
 ```
 
+### 域清单 manifest / resegment / staging-dir（4.6+）
+
+| 命令 | 说明 |
+|------|------|
+| `fc:mcp:cache:manifest` | `--manifest=domain.json` 缺口检测（默认）或 `--ingest` 批量落盘 |
+| `fc:mcp:resegment` | 已有 `mcp-raw` 迁到新 segment，无需重拉 MCP；默认保留源路径，可用 `--remove-source` 删除源节点目录 |
+| `fc:mcp:ingest --staging-dir=<dir>` | 从目录读三段文件（标准名或 `3710-5718-dc.txt` 约定） |
+
+**域清单格式**（`schemaVersion: 1`；亦支持扁平 `[{url,...}]`）：
+
+```json
+{
+  "schemaVersion": 1,
+  "defaultNodeSegment": "sip",
+  "items": [
+    {
+      "url": "https://www.figma.com/design/...?node-id=3710-5718",
+      "nodeSegment": "optional-override",
+      "label": "section-overview",
+      "kind": "section-overview",
+      "get_design_context": "...",
+      "get_metadata": "...",
+      "get_variable_defs": {}
+    }
+  ]
+}
+```
+
+```bash
+# 缺口检测（全命中 exit 0）
+pnpm run fc:mcp:cache:manifest -- --manifest=figma-cache/manifests/sip/nodes.manifest.json
+
+# 批量 ingest（缺 MCP 字段的 item 记 fail，不猜测）
+pnpm run fc:mcp:cache:manifest -- --manifest=payloads.json --ingest --skip-existing
+
+# 扁平 mcp-raw 迁到 segment（确认 index 指向目标后可加 --remove-source）
+pnpm run fc:mcp:resegment -- --file-key=abc --node-id=3710:5718 --node-segment=sip
+pnpm run fc:mcp:resegment -- --file-key=abc --node-id=3710:5718 --node-segment=sip --remove-source
+
+# Agent 临时目录落盘（禁止项目根写 .cjs 胶水）
+node scripts/workflow/mcp-raw-ingest.cjs --quiet --staging-dir=staging-ingest-3710-5718 --url="..."
+```
+
+**禁止**：消费方项目根 `staging-ingest-*` 无 `.fc-mcp-ingest-staging` 标记、或 `reports/runtime/*.cjs` 胶水脚本；见 `docs/AGENT-RUNTIME-GUARDRAILS.md`。
+
 默认行为：写入约定文件名、`mcp-raw-manifest.json`（sha256 / size / toolCalls），并串联 **`fc:ensure --source=figma-mcp`** → **`fc:validate`** → **`fc:budget --mcp-only`**。成功路径推荐 **`npm run fc:mcp:ingest:quiet`**（内置 `--quiet`，末行仅摘要）。需要刷新派生物时在**同一条命令**上加 **`--enrich`**。可用 **`--skip-budget`** 跳过 budget（少见）。完整选项：`npm run fc:mcp:ingest -- --help`。
 
 ### 稿内标注 `data-annotations`（与 MCP 尾部消毒）
@@ -409,6 +454,7 @@ npm run fc:init
 | `FIGMA_CACHE_ADAPTER_DOC_CACHE` | `cache-root` 模式下 adapter 提示文档路径（相对项目根，默认 `figma-cache/docs/figma-cache-adapter-hint.md`） |
 | `FIGMA_CACHE_ADAPTER_DOC_WRITE_POLICY` | adapter 提示写入策略：`if-missing`（默认）/ `always` |
 | `FIGMA_CACHE_FLOW_README` | **仅包内示例钩子**：人类可读的「流程 / 需求总览」Markdown 相对路径，默认 **`docs/figma-flow-readme.md`**；每次 `ensure` 对**新 cacheKey** 幂等追加一节 |
+| `FIGMA_CACHE_SKIP_FLOW_README` | 设为 `1` 时跳过 `postEnsure` 对 flow readme 的追加（工具链单测/临时缓存推荐） |
 
 ## 人工校验清单（对照 `validate`）
 

@@ -196,11 +196,34 @@ function ensureAdapterContract(ctx) {
  * 在单文件里维护「已缓存节点」登记（按 cacheKey 幂等追加），与 index.json / flows 互补：适合评审与新人阅读。
  * @param {object} ctx
  */
+function resolveReadmePathRel(root, maybePath) {
+  if (!maybePath) {
+    return "-";
+  }
+  const abs = path.isAbsolute(maybePath)
+    ? path.normalize(maybePath)
+    : path.resolve(root, maybePath);
+  const rel = normalizePosixPath(path.relative(root, abs));
+  if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+    return rel;
+  }
+  const norm = normalizePosixPath(abs);
+  const marker = "/figma-cache/";
+  const idx = norm.lastIndexOf(marker);
+  if (idx >= 0) {
+    return `figma-cache/${norm.slice(idx + marker.length)}`;
+  }
+  return "(见 index.json paths；缓存目录不在项目根内)";
+}
+
 function appendFlowReadmeRegistry(ctx) {
+  if (process.env.FIGMA_CACHE_SKIP_FLOW_README === "1") {
+    return;
+  }
   const abs = path.resolve(ctx.root, FLOW_README_REL);
   const marker = `<!-- cache-node:${ctx.cacheKey} -->`;
-  const specRel = normalizePosixPath(path.relative(ctx.root, path.resolve(ctx.root, ctx.paths.spec)));
-  const metaRel = normalizePosixPath(path.relative(ctx.root, path.resolve(ctx.root, ctx.paths.meta)));
+  const specRel = resolveReadmePathRel(ctx.root, ctx.paths.spec);
+  const metaRel = resolveReadmePathRel(ctx.root, ctx.paths.meta);
   const completeness = Array.isArray(ctx.completeness) && ctx.completeness.length ? ctx.completeness.join(", ") : "-";
   const block =
     `\n${marker}\n` +

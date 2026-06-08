@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+## 4.6.0（2026-06-08）
+
+- **域清单 `fc:mcp:cache:manifest`**：`scripts/workflow/mcp-cache-manifest.cjs` 驱动任意消费方域清单（`schemaVersion:1` 或扁平数组）；默认 `--gap-check-only` 检测缺失 mcp-raw；`--ingest` 对含 MCP 三段的 item 走 `--stdin` 落盘（缺字段不猜测）。
+- **`fc:mcp:resegment`**：将已有 `mcp-raw/` 复制到新 `node-segment` 无需重拉 MCP；更新 `ingestToolchain` 并串联 `ensure` + `validate`。
+- **`fc:mcp:ingest --staging-dir`**：从目录读取标准名或 `{nodeId}-dc.txt` 约定文件；成功后默认可清理 `staging-ingest-*` / 含 `.fc-mcp-ingest-staging` 的目录。
+- **hygiene 扩展**：扫描**项目根** `staging-ingest-*` 无标记目录为 blocking（与 `reports/runtime` 一致）。
+- **小修（4.5.1 并入）**：`mcp-cache-batch.cjs` 的 `BIN` 使用 `PKG_ROOT`（与 `mcp-raw-ingest` 一致），消费方项目无本地 `bin/figma-cache.js` 时 validate 仍可用；补单测。
+- **卫生**：`docs/figma-flow-readme.md` 恢复空骨架；`postEnsure` 支持 `FIGMA_CACHE_SKIP_FLOW_README=1`，缓存目录在项目外时不再写入绝对 `spec`/`meta` 路径；`fc:mcp:resegment --remove-source`；`fc:mcp:cache:manifest` 禁止 `--ingest` 与 `--gap-check-only` 同用。
+
 ## 4.5.0（2026-06-08）
 
 - **node-segment 节点分组**：`files/<fileKey>/nodes/<segment>/<nodeId>/` 可选子目录；`--node-segment` / `FIGMA_CACHE_NODE_SEGMENT` 贯穿 `fc:mcp:ingest`、`figma-cache ensure|upsert`、`fc:mcp:batch:cache`；新增 `scripts/workflow/resolve-node-storage.cjs`（显式 segment、index `paths.meta` 回退、默认扁平路径）。

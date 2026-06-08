@@ -31,6 +31,17 @@ function run() {
   r = runAgentRuntimeHygieneGate(root);
   assert.strictEqual(r.ok, true);
 
+  const rootStaging = path.join(root, "staging-ingest-agent-leftover");
+  fs.mkdirSync(rootStaging);
+  fs.writeFileSync(path.join(rootStaging, "chunk.txt"), "x", "utf8");
+  r = runAgentRuntimeHygieneGate(root);
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.blocking.some((b) => b.includes("project-root staging")));
+
+  fs.writeFileSync(path.join(rootStaging, ".fc-mcp-ingest-staging"), "1\n", "utf8");
+  r = runAgentRuntimeHygieneGate(root);
+  assert.strictEqual(r.ok, true);
+
   console.log("agent-runtime-hygiene.test.js: ok");
 }
 

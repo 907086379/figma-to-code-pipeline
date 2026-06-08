@@ -28,6 +28,9 @@
  *   --no-cleanup-staging  禁用成功后删除输入 staging 目录（见下方）
  *   --materialize-staging 与 --stdin 合用：在本进程 cwd 下创建 staging-ingest-<node>/，
  *                          写入三段文件与 .fc-mcp-ingest-staging 标记；链路成功后必定删除（脚本自有目录）
+ *   --staging-dir=<dir>    从目录读取三段文件（标准名 mcp-raw-get-*.txt/xml/json 或
+ *                          {nodeId-dashes}-dc.txt / -meta.txt / -vd.json）；成功后默认删除
+ *                          （目录名 staging-ingest-* 或含 .fc-mcp-ingest-staging 时）
  *
  * 也可用 --file-key + --node-id（11069:3124 或 11069-3124）代替 --url。
  * Windows：npm 经 cmd 时 `&m=dev` 可能被拆成独立 argv；本脚本在解析前会把后续 `key=value` 片段自动拼回 `--url`（见 `mcp-ingest-argv.cjs`）。未传 `--url` 时还可读环境变量 `FIGMA_MCP_INGEST_URL` 或 `--url-file`（单行 URL）。
@@ -239,7 +242,43 @@ function parseStdinJson(raw) {
   }
 }
 
-function pickPayload(stdinPayload, values) {
+function readStagingDirFiles(stagingDirAbs, nodeIdColon) {
+  const stdDc = path.join(stagingDirAbs, DEFAULT_FILES.get_design_context);
+  const stdMeta = path.join(stagingDirAbs, DEFAULT_FILES.get_metadata);
+  const stdVd = path.join(stagingDirAbs, DEFAULT_FILES.get_variable_defs);
+
+  if (fs.existsSync(stdDc) && fs.existsSync(stdMeta) && fs.existsSync(stdVd)) {
+    return {
+      designContext: fs.readFileSync(stdDc, "utf8"),
+      metadata: fs.readFileSync(stdMeta, "utf8"),
+      variableDefs: JSON.parse(fs.readFileSync(stdVd, "utf8")),
+      stagingDirAbs,
+    };
+  }
+
+  const dashed = sanitizeNodeId(nodeIdColon);
+  const convDc = path.join(stagingDirAbs, `${dashed}-dc.txt`);
+  const convMeta = path.join(stagingDirAbs, `${dashed}-meta.txt`);
+  const convVd = path.join(stagingDirAbs, `${dashed}-vd.json`);
+
+  if (fs.existsSync(convDc) && fs.existsSync(convMeta) && fs.existsSync(convVd)) {
+    return {
+      designContext: fs.readFileSync(convDc, "utf8"),
+      metadata: fs.readFileSync(convMeta, "utf8"),
+      variableDefs: JSON.parse(fs.readFileSync(convVd, "utf8")),
+      stagingDirAbs,
+    };
+  }
+
+  throw new Error(
+    `staging-dir missing files: expected standard names (${DEFAULT_FILES.get_design_context}, ...) or ${dashed}-dc.txt / -meta.txt / -vd.json`,
+  );
+}
+
+function pickPayload(stdinPayload, values, stagingPayload) {
+  if (stagingPayload) {
+    return stagingPayload;
+  }
   if (stdinPayload) {
     const dc = stdinPayload.get_design_context ?? stdinPayload.designContext;
     const meta = stdinPayload.get_metadata ?? stdinPayload.metadata;
@@ -324,6 +363,7 @@ function parseArgs(argv) {
       "metadata-file",
       "variable-defs-file",
       "node-segment",
+      "staging-dir",
     ],
     booleanFlags: [
       "stdin",
@@ -446,6 +486,7 @@ Options:
   --enrich                 对本节点执行 fc:enrich <url>
   --no-cleanup-staging     保留输入 staging 临时目录（默认成功后删除）
   --materialize-staging    与 --stdin 合用：在 cwd 下生成 staging-ingest-<node>/ 与标记，完成后删除
+  --staging-dir=<dir>      从目录读取三段 MCP 文件（标准名或 {nodeId}-dc.txt 约定）；成功后默认可清理
   --quiet                  成功时仅打印一行摘要；抑制 ensure/validate/budget/enrich 的 JSON 标准输出
   --require-project-setup  要求 figma-cache/project-setup.manifest.json 为 complete（或设 FIGMA_CACHE_REQUIRE_PROJECT_SETUP=1）
   --help                   显示本说明
@@ -581,6 +622,45 @@ function main() {
     });
   }
 
+  const stagingDirInput = (values["staging-dir"] || "").trim();
+  let stagingDirPayload = null;
+  let stagingDirAbsFromFlag = null;
+  if (stagingDirInput) {
+    if (flags.stdin || flags["materialize-staging"]) {
+      failPreflight({
+        values,
+        target,
+        stage: "staging-dir",
+        message: "--staging-dir cannot be combined with --stdin or --materialize-staging",
+      });
+    }
+    stagingDirAbsFromFlag = resolvePath(stagingDirInput);
+    if (!stagingDirAbsFromFlag || !fs.existsSync(stagingDirAbsFromFlag)) {
+      failPreflight({
+        values,
+        target,
+        stage: "staging-dir",
+        message: `--staging-dir not found: ${stagingDirInput}`,
+      });
+    }
+    try {
+      const sp = readStagingDirFiles(stagingDirAbsFromFlag, target.nodeId);
+      stagingDirPayload = {
+        designContext: sp.designContext,
+        metadata: sp.metadata,
+        variableDefs: sp.variableDefs,
+      };
+      stagingDirAbsFromFlag = sp.stagingDirAbs;
+    } catch (e) {
+      failPreflight({
+        values,
+        target,
+        stage: "staging-dir",
+        message: e.message || String(e),
+      });
+    }
+  }
+
   if (flags["materialize-staging"] && !flags.stdin) {
     failPreflight({
       values,
@@ -660,7 +740,7 @@ function main() {
 
   let payload;
   try {
-    payload = pickPayload(stdinPayload, values);
+    payload = pickPayload(stdinPayload, values, stagingDirPayload);
   } catch (e) {
     failPreflight({
       values,
@@ -830,6 +910,8 @@ function main() {
     const cwd = process.cwd();
     if (scriptOwnedStagingAbs) {
       tryRemoveScriptOwnedStagingDir(scriptOwnedStagingAbs, cwd, quiet);
+    } else if (stagingDirAbsFromFlag) {
+      tryRemoveStagingInputDir({ sharedDir: stagingDirAbsFromFlag, cwd, quiet });
     } else if (!flags.stdin) {
       const dcIn = resolvePath(values["design-context-file"] || values.designContextFile);
       const metaIn = resolvePath(values["metadata-file"] || values.metadataFile);

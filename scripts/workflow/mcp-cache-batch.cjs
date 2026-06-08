@@ -6,11 +6,12 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { parseCli } = require("../cli-args.cjs");
 const { assertProjectSetupPreflight } = require("./project-setup-preflight.cjs");
-const { resolveNodeDirAbs } = require("./resolve-node-storage.cjs");
+const { resolveNodeDirAbs, parseCacheKeyFromUrl } = require("./resolve-node-storage.cjs");
 
+const PKG_ROOT = path.resolve(__dirname, "..", "..");
 const ROOT = process.cwd();
 const INGEST = path.join(__dirname, "mcp-raw-ingest.cjs");
-const BIN = path.join(ROOT, "bin", "figma-cache.js");
+const BIN = path.join(PKG_ROOT, "bin", "figma-cache.js");
 
 function readUrls(values, positional) {
   const file = (values["urls-file"] || values.urlsFile || "").trim();
@@ -51,15 +52,6 @@ function mcpRawExists(cacheDirRel, fileKey, nodeIdColon, nodeSegment) {
   });
   const manifest = path.join(nodeDirAbs, "mcp-raw", "mcp-raw-manifest.json");
   return fs.existsSync(manifest);
-}
-
-function parseCacheKeyFromUrl(url) {
-  const u = new URL(url);
-  const m = u.pathname.match(/\/(file|design)\/([^/]+)/i);
-  const fileKey = m ? m[2] : "";
-  const nodeRaw = u.searchParams.get("node-id") || "";
-  const nodeColon = nodeRaw.replace(/-/g, ":");
-  return { fileKey, nodeIdColon: nodeColon };
 }
 
 function runIngestStdin(url, payload, quiet, nodeSegment) {

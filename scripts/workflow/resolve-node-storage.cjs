@@ -12,6 +12,28 @@ function sanitizeNodeId(nodeId) {
 }
 
 /**
+ * @param {string} nodeId
+ * @returns {string}
+ */
+function normalizeNodeIdColon(nodeId) {
+  const raw = String(nodeId).trim();
+  return /^(\d+)-(\d+)$/.test(raw) ? raw.replace(/^(\d+)-(\d+)$/, "$1:$2") : raw;
+}
+
+/**
+ * @param {string} url
+ * @returns {{ fileKey: string, nodeIdColon: string }}
+ */
+function parseCacheKeyFromUrl(url) {
+  const u = new URL(url);
+  const m = u.pathname.match(/\/(file|design)\/([^/]+)/i);
+  const fileKey = m ? m[2] : "";
+  const nodeRaw = u.searchParams.get("node-id") || "";
+  const nodeColon = nodeRaw.replace(/-/g, ":");
+  return { fileKey, nodeIdColon: nodeColon };
+}
+
+/**
  * Trim leading/trailing slashes; reject path traversal segments.
  * @param {string} segment
  * @returns {string}
@@ -114,6 +136,8 @@ function resolveNodeDirAbs(params) {
 
 module.exports = {
   sanitizeNodeId,
+  normalizeNodeIdColon,
+  parseCacheKeyFromUrl,
   normalizeNodeSegment,
   resolveNodeDirRel,
   resolveNodeDirAbs,

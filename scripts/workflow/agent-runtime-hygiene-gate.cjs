@@ -24,8 +24,23 @@ function runAgentRuntimeHygieneGate(root, options) {
   const blocking = [];
   const warnings = [];
 
+  if (fs.existsSync(root)) {
+    const rootEntries = fs.readdirSync(root, { withFileTypes: true });
+    for (const ent of rootEntries) {
+      if (!ent.isDirectory() || !/^staging-ingest-/i.test(ent.name)) {
+        continue;
+      }
+      const abs = path.join(root, ent.name);
+      if (!fs.existsSync(path.join(abs, STAGING_MARKER))) {
+        blocking.push(
+          `Forbidden project-root staging dir without ${STAGING_MARKER}: ${path.relative(root, abs).replace(/\\/g, "/")} (use fc:mcp:ingest --staging-dir or --materialize-staging)`,
+        );
+      }
+    }
+  }
+
   if (!fs.existsSync(runtimeDir)) {
-    return { ok: true, blocking, warnings };
+    return { ok: blocking.length === 0, blocking, warnings };
   }
 
   const entries = fs.readdirSync(runtimeDir, { withFileTypes: true });

@@ -1,6 +1,6 @@
 # Agent 运行时门禁（project-setup + hygiene）
 
-> 版本：**4.4.0+** · 解决「忘记 AGENT-SETUP」与「reports/runtime 胶水脚本」两类回归。
+> 版本：**4.6.0+** · 解决「忘记 AGENT-SETUP」、「reports/runtime 胶水脚本」与「项目根 staging 残留」三类回归。
 
 ## 1. project-setup（机器可读）
 
@@ -33,10 +33,10 @@ figma-cache project-setup finish   # 先完成 AGENT-SETUP
 
 ## 2. agent-runtime-hygiene（禁止胶水）
 
-扫描 `figma-cache/reports/runtime/`：
+扫描 `figma-cache/reports/runtime/` 与**项目根** `staging-ingest-*`：
 
-- **blocking**：任意 `*.cjs` / `*.mjs`
-- **blocking**：`staging-*` 且无 `.fc-mcp-ingest-staging` 标记
+- **blocking**：`reports/runtime` 下任意 `*.cjs` / `*.mjs`
+- **blocking**：`reports/runtime/staging-*` 或项目根 `staging-ingest-*` 且无 `.fc-mcp-ingest-staging` 标记
 
 ```bash
 figma-cache validate --hygiene
@@ -52,9 +52,11 @@ pnpm run fc:mcp:ingest:url -- "https://www.figma.com/design/...?node-id=1-2"
 node node_modules/figma-to-code-pipeline/scripts/workflow/mcp-raw-ingest.cjs --quiet --stdin --url="..."
 ```
 
-**禁止**：`pnpm run fc:mcp:ingest:quiet -- --url`；禁止在 `reports/runtime` 写 `ingest-*.cjs`。
+**禁止**：`pnpm run fc:mcp:ingest:quiet -- --url`；禁止在 `reports/runtime` 或项目根写 `ingest-*.cjs` 胶水。
 
-## 3. 批量缓存（无胶水）
+**推荐（4.6+）**：MCP 三段写入 `staging-ingest-<node>/` 后使用 **`--staging-dir`** 或 **`--stdin`** / **`--materialize-staging`**；域清单用 **`fc:mcp:cache:manifest`**；segment 迁移用 **`fc:mcp:resegment`**。
+
+## 3. 批量缓存与域清单（无胶水）
 
 ```bash
 # 多 URL + MCP payload（Agent 收集后一次落盘）
@@ -64,6 +66,17 @@ pnpm run fc:mcp:batch:cache -- --batch-json=payloads.json --skip-existing --requ
 `payloads.json` 为数组：`{ "url", "get_design_context", "get_metadata", "get_variable_defs" }`。
 
 仅 `--urls-file` 且无 payload 时不会调 MCP，只用于检查缺失缓存。
+
+```bash
+# 域清单缺口检测 / 批量 ingest（任意消费方，不绑定 sip）
+pnpm run fc:mcp:cache:manifest -- --manifest=figma-cache/manifests/my-domain/nodes.manifest.json
+pnpm run fc:mcp:cache:manifest -- --manifest=payloads.json --ingest --skip-existing
+
+# 已有 mcp-raw 迁 segment（无需重拉 MCP；默认保留源路径）
+pnpm run fc:mcp:resegment -- --file-key=... --node-id=3710:5718 --node-segment=sip
+# 确认 index 已指向目标 segment 后可删除源目录
+pnpm run fc:mcp:resegment -- --file-key=... --node-id=3710:5718 --node-segment=sip --remove-source
+```
 
 ## 4. 业务仓接入清单
 
